@@ -28,8 +28,49 @@ const parsePortfolioMeta = (name = "") => {
   }
 }
 
+const getYouTubeId = (url) => {
+  const match = url.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{6,})/)
+  return match ? match[1] : ""
+}
+
+const getVimeoId = (url) => {
+  const match = url.match(/vimeo\.com\/(?:video\/)?(\d+)/)
+  return match ? match[1] : ""
+}
+
+const buildEmbedUrl = (kind, url) => {
+  if (kind === "youtube") {
+    const id = getYouTubeId(url)
+    if (!id) return ""
+    return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1`
+  }
+
+  if (kind === "vimeo") {
+    const id = getVimeoId(url)
+    if (!id) return ""
+    return `https://player.vimeo.com/video/${id}?autoplay=1&muted=1&loop=1&background=1&playsinline=1`
+  }
+
+  return ""
+}
+
+const buildThumbnailUrl = (kind, url) => {
+  if (kind === "youtube") {
+    const id = getYouTubeId(url)
+    return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : ""
+  }
+
+  if (kind === "vimeo") {
+    const id = getVimeoId(url)
+    return id ? `https://vumbnail.com/${id}.jpg` : ""
+  }
+
+  return ""
+}
+
 export default function Portfolio() {
   const [remoteItems, setRemoteItems] = useState([])
+  const [externalLinks, setExternalLinks] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [activeIndexByCategory, setActiveIndexByCategory] = useState({})
   const [selectedItem, setSelectedItem] = useState(null)
@@ -55,9 +96,24 @@ export default function Portfolio() {
     }
   }, [])
 
+  const fetchExternalLinks = useCallback(async () => {
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/external-links`)
+      if (!response.ok) {
+        throw new Error("Failed to load external links")
+      }
+
+      const data = await response.json()
+      setExternalLinks((data.items || []).filter(Boolean))
+    } catch (error) {
+      console.warn("Failed to list external links", error)
+    }
+  }, [])
+
   useEffect(() => {
     fetchPortfolio()
-  }, [fetchPortfolio])
+    fetchExternalLinks()
+  }, [fetchPortfolio, fetchExternalLinks])
 
   const itemsWithMeta = useMemo(
     () =>
@@ -89,11 +145,70 @@ export default function Portfolio() {
     return grouped
   }, [itemsWithMeta])
 
+  const externalItemsByCategory = useMemo(() => {
+    return externalLinks.reduce((accumulator, link) => {
+      const categoryId =
+        portfolioCategories.find((category) => category.id === link.category)?.id ||
+        "motion-saas"
+
+      if (!accumulator[categoryId]) {
+        accumulator[categoryId] = []
+      }
+
+      const kind = link.kind || "video"
+      const fallbackTitle =
+        kind === "youtube"
+          ? "YouTube Video"
+          : kind === "vimeo"
+            ? "Vimeo Video"
+            : kind === "image"
+              ? "External Image"
+              : "External Video"
+
+      const baseItem = {
+        name: `external-${link.id}`,
+        displayName: link.title || fallbackTitle,
+        category: categoryId,
+      }
+
+      if (kind === "image") {
+        accumulator[categoryId].push({
+          ...baseItem,
+          type: "image",
+          src: link.url,
+        })
+      } else if (kind === "video") {
+        accumulator[categoryId].push({
+          ...baseItem,
+          type: "video",
+          src: link.url,
+        })
+      } else if (kind === "youtube" || kind === "vimeo") {
+        const embedUrl = buildEmbedUrl(kind, link.url)
+        const thumbnailUrl = buildThumbnailUrl(kind, link.url)
+        accumulator[categoryId].push({
+          ...baseItem,
+          type: "embed",
+          embedUrl,
+          thumbnailUrl,
+          provider: kind,
+        })
+      }
+
+      return accumulator
+    }, {})
+  }, [externalLinks])
+
   const displayItemsByCategory = useMemo(() => {
     return portfolioCategories.reduce((accumulator, category) => {
       const items = itemsByCategory[category.id] || []
-      if (items.length > 0) {
+      const externalItems = externalItemsByCategory[category.id] || []
+      if (items.length > 0 && externalItems.length > 0) {
+        accumulator[category.id] = [...items, ...externalItems]
+      } else if (items.length > 0) {
         accumulator[category.id] = items
+      } else if (externalItems.length > 0) {
+        accumulator[category.id] = externalItems
       } else {
         accumulator[category.id] = [
           {
@@ -105,7 +220,7 @@ export default function Portfolio() {
       }
       return accumulator
     }, {})
-  }, [itemsByCategory])
+  }, [itemsByCategory, externalItemsByCategory])
 
   useEffect(() => {
     setActiveIndexByCategory((prev) => {
@@ -301,7 +416,11 @@ export default function Portfolio() {
                               return
                             }
 
-                            if (item.type === "image" || item.type === "video") {
+                            if (
+                              item.type === "image" ||
+                              item.type === "video" ||
+                              item.type === "embed"
+                            ) {
                               setSelectedItem(item)
                             }
                           }}
@@ -319,7 +438,46 @@ export default function Portfolio() {
                               ⤢
                             </button>
                           )}
-                          {item.type === "video" ? (
+                          {item.type === "embed" ? (
+                            index === activeIndex && item.embedUrl ? (
+                              <iframe
+                                src={item.embedUrl}
+                                title={item.displayName || "External video"}
+                                allow="autoplay; fullscreen; picture-in-picture"
+                                allowFullScreen
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  border: "none",
+                                }}
+                              />
+                            ) : item.thumbnailUrl ? (
+                              <img
+                                src={item.thumbnailUrl}
+                                alt={item.displayName || "External video"}
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  background: "linear-gradient(135deg, #f2f2f2 0%, #d9d9d9 100%)",
+                                  color: "#666",
+                                  font: "700 14px/18px Quicksand, sans-serif",
+                                  letterSpacing: "0.02em",
+                                  textTransform: "uppercase",
+                                  textAlign: "center",
+                                  padding: "0 12px",
+                                }}
+                              >
+                                {item.displayName || "External Video"}
+                              </div>
+                            )
+                          ) : item.type === "video" ? (
                             <video
                               src={item.src}
                               loop
@@ -470,7 +628,20 @@ export default function Portfolio() {
                 ⤢
               </button>
             )}
-            {selectedItem.type === "video" ? (
+            {selectedItem.type === "embed" ? (
+              <iframe
+                src={selectedItem.embedUrl}
+                title={selectedItem.displayName || "External video"}
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowFullScreen
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  maxHeight: "85vh",
+                  border: "none",
+                }}
+              />
+            ) : selectedItem.type === "video" ? (
               <video
                 src={selectedItem.src}
                 controls
