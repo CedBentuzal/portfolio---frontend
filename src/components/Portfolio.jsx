@@ -2,33 +2,42 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "")
 
-const videoExtensions = ["mp4", "webm", "mov", "m4v"]
+const portfolioCategories = [
+  { id: "motion-saas", label: "Motion and SaaS" },
+  { id: "shorts", label: "Shorts" },
+  { id: "static-visuals", label: "Static visuals" },
+]
 
-const isVideo = (fileName) => {
-  const ext = fileName.split(".").pop()?.toLowerCase()
-  return videoExtensions.includes(ext || "")
+const parsePortfolioMeta = (name = "") => {
+  const baseName = name.split("/").pop() || name
+  const parts = baseName.split("__")
+
+  if (parts.length >= 3) {
+    const [category, featuredFlag, ...rest] = parts
+    return {
+      category,
+      isFeatured: featuredFlag === "featured",
+      displayName: rest.join("__") || baseName,
+    }
+  }
+
+  return {
+    category: "motion-saas",
+    isFeatured: false,
+    displayName: baseName,
+  }
 }
 
 export default function Portfolio() {
   const [remoteItems, setRemoteItems] = useState([])
   const [isLoading, setIsLoading] = useState(false)
-  const [errorMessage, setErrorMessage] = useState("")
-  const [activeIndex, setActiveIndex] = useState(1)
+  const [activeIndexByCategory, setActiveIndexByCategory] = useState({})
   const [selectedItem, setSelectedItem] = useState(null)
-  const videoRefs = useRef([])
-
-  const placeholderItems = useMemo(
-    () => [
-      { name: "placeholder-1", type: "placeholder", label: "Placeholder" },
-      { name: "placeholder-2", type: "placeholder", label: "Placeholder" },
-      { name: "placeholder-3", type: "placeholder", label: "Placeholder" },
-    ],
-    []
-  )
+  const videoRefsByCategory = useRef({})
+  const modalVideoRef = useRef(null)
 
   const fetchPortfolio = useCallback(async () => {
     setIsLoading(true)
-    setErrorMessage("")
     try {
       const response = await fetch(`${backendBaseUrl}/api/cloudinary-list`)
 
@@ -39,12 +48,8 @@ export default function Portfolio() {
       const data = await response.json()
       const items = (data.items || []).filter(Boolean)
       setRemoteItems(items)
-      if (items.length > 0) {
-        setActiveIndex(items.length > 1 ? 1 : 0)
-      }
     } catch (error) {
       console.warn("Failed to list portfolio items", error)
-      setErrorMessage("Unable to load uploads. Check Cloudinary list endpoint.")
     } finally {
       setIsLoading(false)
     }
@@ -54,41 +59,125 @@ export default function Portfolio() {
     fetchPortfolio()
   }, [fetchPortfolio])
 
-  const displayItems = remoteItems.length > 0 ? remoteItems : placeholderItems
-  const maxIndex = Math.max(0, displayItems.length - 1)
-
-  useEffect(() => {
-    if (activeIndex > maxIndex) {
-      setActiveIndex(maxIndex)
-    }
-  }, [activeIndex, maxIndex])
-
-  useEffect(() => {
-    videoRefs.current.forEach((video, index) => {
-      if (!video) {
-        return
-      }
-
-      if (index === activeIndex) {
-        const playPromise = video.play()
-        if (playPromise && typeof playPromise.catch === "function") {
-          playPromise.catch(() => {})
+  const itemsWithMeta = useMemo(
+    () =>
+      remoteItems.map((item) => {
+        const meta = parsePortfolioMeta(item.name)
+        return {
+          ...item,
+          category: meta.category,
+          isFeatured: meta.isFeatured,
+          displayName: meta.displayName,
         }
-      } else {
-        video.pause()
-      }
+      }),
+    [remoteItems]
+  )
+
+  const itemsByCategory = useMemo(() => {
+    const grouped = portfolioCategories.reduce((accumulator, category) => {
+      accumulator[category.id] = []
+      return accumulator
+    }, {})
+
+    itemsWithMeta.forEach((item) => {
+      const categoryId =
+        portfolioCategories.find((category) => category.id === item.category)?.id ||
+        "motion-saas"
+      grouped[categoryId].push(item)
     })
-  }, [activeIndex, displayItems])
 
-  const handlePrev = () => {
-    setActiveIndex((prev) => Math.max(0, prev - 1))
+    return grouped
+  }, [itemsWithMeta])
+
+  const displayItemsByCategory = useMemo(() => {
+    return portfolioCategories.reduce((accumulator, category) => {
+      const items = itemsByCategory[category.id] || []
+      if (items.length > 0) {
+        accumulator[category.id] = items
+      } else {
+        accumulator[category.id] = [
+          {
+            name: `placeholder-${category.id}`,
+            type: "placeholder",
+            label: category.label,
+          },
+        ]
+      }
+      return accumulator
+    }, {})
+  }, [itemsByCategory])
+
+  useEffect(() => {
+    setActiveIndexByCategory((prev) => {
+      let hasChanges = false
+      const next = { ...prev }
+
+      portfolioCategories.forEach((category) => {
+        const items = displayItemsByCategory[category.id] || []
+        const existingIndex = prev[category.id]
+        const featuredIndex = items.findIndex((item) => item.isFeatured)
+        const fallbackIndex = featuredIndex >= 0 ? featuredIndex : 0
+
+        if (existingIndex === undefined) {
+          next[category.id] = fallbackIndex
+          hasChanges = true
+          return
+        }
+
+        if (existingIndex >= items.length) {
+          next[category.id] = fallbackIndex
+          hasChanges = true
+          return
+        }
+
+        if (featuredIndex >= 0 && existingIndex !== featuredIndex) {
+          next[category.id] = featuredIndex
+          hasChanges = true
+        }
+      })
+
+      return hasChanges ? next : prev
+    })
+  }, [displayItemsByCategory])
+
+  useEffect(() => {
+    portfolioCategories.forEach((category) => {
+      const items = displayItemsByCategory[category.id] || []
+      const activeIndex = activeIndexByCategory[category.id] ?? 0
+      const refs = videoRefsByCategory.current[category.id] || []
+
+      refs.forEach((video, index) => {
+        if (!video) {
+          return
+        }
+
+        if (index === activeIndex && items[index]?.type === "video") {
+          const playPromise = video.play()
+          if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(() => {})
+          }
+        } else {
+          video.pause()
+        }
+      })
+    })
+  }, [activeIndexByCategory, displayItemsByCategory])
+
+  const handlePrev = (categoryId) => {
+    setActiveIndexByCategory((prev) => {
+      const currentIndex = prev[categoryId] ?? 0
+      return { ...prev, [categoryId]: Math.max(0, currentIndex - 1) }
+    })
   }
 
-  const handleNext = () => {
-    setActiveIndex((prev) => Math.min(maxIndex, prev + 1))
+  const handleNext = (categoryId, maxIndex) => {
+    setActiveIndexByCategory((prev) => {
+      const currentIndex = prev[categoryId] ?? 0
+      return { ...prev, [categoryId]: Math.min(maxIndex, currentIndex + 1) }
+    })
   }
 
-  const getCoverflowStyle = (index) => {
+  const getCoverflowStyle = (index, activeIndex) => {
     const offset = index - activeIndex
     const absOffset = Math.abs(offset)
 
@@ -110,6 +199,23 @@ export default function Portfolio() {
       transform: `translateX(calc(-50% + ${translateX}px)) scale(${scale}) rotateY(${rotateY}deg)`,
       opacity,
       zIndex: 10 - absOffset,
+    }
+  }
+
+  const handleEnterFullscreen = () => {
+    const video = modalVideoRef.current
+    if (!video) {
+      return
+    }
+
+    const requestFullscreen =
+      video.requestFullscreen ||
+      video.webkitRequestFullscreen ||
+      video.mozRequestFullScreen ||
+      video.msRequestFullscreen
+
+    if (requestFullscreen) {
+      requestFullscreen.call(video)
     }
   }
 
@@ -140,110 +246,135 @@ export default function Portfolio() {
               Motion/Graphic Design
             </h2>
 
-            <div className="coverflow-row">
-              {displayItems.length > 1 && (
-                <button
-                  type="button"
-                  className="portfolio-arrow"
-                  onClick={handlePrev}
-                  disabled={activeIndex === 0}
-                  aria-label="Previous"
-                >
-                  ←
-                </button>
-              )}
-              <div className="coverflow">
-                {displayItems.map((item, index) => (
-                  <div
-                    key={item.name}
-                    className="portfolio-card coverflow-item"
-                    style={{
-                      width: "228px",
-                      height: "272px",
-                      backgroundColor: "#d9d9d9",
-                      cursor: "pointer",
-                      overflow: "hidden",
-                      ...getCoverflowStyle(index),
-                    }}
-                    onClick={() => {
-                      if (item.type === "video" && index === activeIndex) {
-                        const video = videoRefs.current[index]
-                        if (video?.paused) {
-                          const playPromise = video.play()
-                          if (playPromise && typeof playPromise.catch === "function") {
-                            playPromise.catch(() => {})
-                          }
-                        } else if (video) {
-                          video.pause()
-                        }
-                        return
-                      }
+            {portfolioCategories.map((category) => {
+              const displayItems = displayItemsByCategory[category.id] || []
+              const activeIndex = activeIndexByCategory[category.id] ?? 0
+              const maxIndex = Math.max(0, displayItems.length - 1)
 
-                      if (item.type === "image" || item.type === "video") {
-                        setSelectedItem(item)
-                      }
+              return (
+                <div key={category.id} style={{ marginBottom: "56px" }}>
+                  <h3
+                    style={{
+                      font: "600 22px/28px Quicksand, sans-serif",
+                      color: "#222",
+                      marginBottom: "20px",
+                      textAlign: "center",
                     }}
                   >
-                    {item.type === "video" ? (
-                      <video
-                        src={item.src}
-                        loop
-                        muted
-                        playsInline
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        ref={(node) => {
-                          videoRefs.current[index] = node
-                        }}
-                      />
-                    ) : item.type === "image" ? (
-                      <img
-                        src={item.src}
-                        alt={item.name}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          background: "linear-gradient(135deg, #f2f2f2 0%, #d9d9d9 100%)",
-                          color: "#666",
-                          font: "700 14px/18px Quicksand, sans-serif",
-                          letterSpacing: "0.02em",
-                          textTransform: "uppercase",
-                        }}
+                    {category.label}
+                  </h3>
+                  <div className="coverflow-row">
+                    {displayItems.length > 1 && (
+                      <button
+                        type="button"
+                        className="portfolio-arrow"
+                        onClick={() => handlePrev(category.id)}
+                        disabled={activeIndex === 0}
+                        aria-label="Previous"
                       >
-                        {item.label}
-                      </div>
+                        ←
+                      </button>
+                    )}
+                    <div className="coverflow">
+                      {displayItems.map((item, index) => (
+                        <div
+                          key={`${category.id}-${item.name}`}
+                          className="portfolio-card coverflow-item"
+                          style={{
+                            backgroundColor: "#d9d9d9",
+                            cursor: "pointer",
+                            overflow: "hidden",
+                            ...getCoverflowStyle(index, activeIndex),
+                          }}
+                          onClick={() => {
+                            if (item.type === "video" && index === activeIndex) {
+                              const video =
+                                videoRefsByCategory.current[category.id]?.[index]
+                              if (video?.paused) {
+                                const playPromise = video.play()
+                                if (playPromise && typeof playPromise.catch === "function") {
+                                  playPromise.catch(() => {})
+                                }
+                              } else if (video) {
+                                video.pause()
+                              }
+                              return
+                            }
+
+                            if (item.type === "image" || item.type === "video") {
+                              setSelectedItem(item)
+                            }
+                          }}
+                        >
+                          {item.type === "video" && index === activeIndex && (
+                            <button
+                              type="button"
+                              className="portfolio-expand"
+                              aria-label="Open fullscreen player"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setSelectedItem(item)
+                              }}
+                            >
+                              ⤢
+                            </button>
+                          )}
+                          {item.type === "video" ? (
+                            <video
+                              src={item.src}
+                              loop
+                              muted
+                              playsInline
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              ref={(node) => {
+                                if (!videoRefsByCategory.current[category.id]) {
+                                  videoRefsByCategory.current[category.id] = []
+                                }
+                                videoRefsByCategory.current[category.id][index] = node
+                              }}
+                            />
+                          ) : item.type === "image" ? (
+                            <img
+                              src={item.src}
+                              alt={item.displayName || item.name}
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "linear-gradient(135deg, #f2f2f2 0%, #d9d9d9 100%)",
+                                color: "#666",
+                                font: "700 14px/18px Quicksand, sans-serif",
+                                letterSpacing: "0.02em",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              {item.label}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {displayItems.length > 1 && (
+                      <button
+                        type="button"
+                        className="portfolio-arrow"
+                        onClick={() => handleNext(category.id, maxIndex)}
+                        disabled={activeIndex >= maxIndex}
+                        aria-label="Next"
+                      >
+                        →
+                      </button>
                     )}
                   </div>
-                ))}
-              </div>
-              {displayItems.length > 1 && (
-                <button
-                  type="button"
-                  className="portfolio-arrow"
-                  onClick={handleNext}
-                  disabled={activeIndex >= maxIndex}
-                  aria-label="Next"
-                >
-                  →
-                </button>
-              )}
-            </div>
-            {isLoading && (
-              <p style={{ marginTop: "16px", textAlign: "center", color: "#555" }}>
-                Loading uploads...
-              </p>
-            )}
-            {errorMessage && (
-              <p style={{ marginTop: "8px", textAlign: "center", color: "#b00020" }}>
-                {errorMessage}
-              </p>
-            )}
+                </div>
+              )
+            })}
           </div>
 
           <div>
@@ -316,6 +447,29 @@ export default function Portfolio() {
             >
               ×
             </button>
+            {selectedItem.type === "video" && (
+              <button
+                type="button"
+                onClick={handleEnterFullscreen}
+                aria-label="Enter fullscreen"
+                style={{
+                  position: "absolute",
+                  right: "56px",
+                  top: "12px",
+                  background: "rgba(255, 255, 255, 0.9)",
+                  border: "none",
+                  borderRadius: "999px",
+                  width: "36px",
+                  height: "36px",
+                  cursor: "pointer",
+                  fontSize: "16px",
+                  lineHeight: "36px",
+                  zIndex: 2,
+                }}
+              >
+                ⤢
+              </button>
+            )}
             {selectedItem.type === "video" ? (
               <video
                 src={selectedItem.src}
@@ -323,6 +477,7 @@ export default function Portfolio() {
                 autoPlay
                 playsInline
                 style={{ width: "100%", height: "100%", maxHeight: "85vh", objectFit: "contain" }}
+                ref={modalVideoRef}
               />
             ) : (
               <img

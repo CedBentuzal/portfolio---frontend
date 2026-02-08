@@ -67,7 +67,8 @@ export default function Hero() {
                 justifyContent: "center",
               }}
             >
-              <button
+              <a
+                href="#contact"
                 className="cta-button"
                 style={{
                   backgroundColor: "white",
@@ -77,6 +78,7 @@ export default function Hero() {
                   border: "none",
                   cursor: "pointer",
                   transition: "box-shadow 0.2s",
+                  textDecoration: "none",
                 }}
               >
                 <span
@@ -85,11 +87,13 @@ export default function Hero() {
                 >
                   Let's connect
                 </span>
-              </button>
+              </a>
 
               <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                 <a
-                  href="#"
+                  href="https://www.instagram.com/cdbn.ae/"
+                  target="_blank"
+                  rel="noreferrer"
                   className="social-icon"
                   style={{
                     width: "34px",
@@ -113,7 +117,9 @@ export default function Hero() {
                 </a>
 
                 <a
-                  href="#"
+                  href="https://www.tiktok.com/@ced.ae"
+                  target="_blank"
+                  rel="noreferrer"
                   className="social-icon"
                   style={{
                     width: "34px",
@@ -137,7 +143,9 @@ export default function Hero() {
                 </a>
 
                 <a
-                  href="#"
+                  href="https://www.facebook.com/Bentuzal/"
+                  target="_blank"
+                  rel="noreferrer"
                   className="social-icon"
                   style={{
                     width: "34px",
