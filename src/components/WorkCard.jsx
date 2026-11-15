@@ -60,12 +60,9 @@ export default function WorkCard({ item, tag, onOpen }) {
           </span>
         )}
       </span>
-      <span className="cd-meta">
-        <span className="cd-meta-text">
-          <span className="cd-title">{item.title}</span>
-          <span className="cd-muted">{item.kindLabel}</span>
-        </span>
-        {item.isFeatured && <span className="cd-mono cd-muted">Featured</span>}
+      <span className="cd-meta-text">
+        <span className="cd-title">{item.title}</span>
+        <span className="cd-muted">{item.kindLabel}</span>
       </span>
     </button>
   )

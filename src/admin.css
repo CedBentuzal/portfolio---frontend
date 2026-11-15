@@ -1,0 +1,190 @@
+/* Admin panel — uses the same Night and Day colors as the site (see theme.css). */
+
+.ad-page {
+  padding: clamp(24px, 5vw, 64px) var(--pad) 120px;
+}
+.ad-wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.ad-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.ad-header h1 {
+  margin-top: 12px !important;
+}
+.ad-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ad-header .cd-btn {
+  padding: 12px 20px;
+}
+
+.ad-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+  padding: clamp(20px, 4vw, 32px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+}
+.ad-card > * {
+  max-width: 100%;
+}
+.ad-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.ad-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+.ad-input {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--surface-2);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.ad-input::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+.ad-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ad-drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 32px 20px;
+  border: 1px dashed var(--accent);
+  border-radius: 16px;
+  background: var(--bg);
+  text-align: center;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.ad-drop input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.ad-drop:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cd-site .cd-btn:disabled,
+.ad-small:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+
+.ad-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.ad-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ad-kind {
+  flex: none;
+  width: 92px;
+  color: var(--muted);
+}
+.ad-row .ad-input {
+  flex: 1;
+}
+.ad-small {
+  flex: none;
+  padding: 10px 14px;
+  border: 1px solid var(--text);
+  border-radius: 999px;
+  background: transparent;
+  font-weight: 600;
+  font-size: 14px;
+}
+.ad-small:not(:disabled):hover {
+  background: var(--text);
+  color: var(--bg);
+}
+.ad-small--danger {
+  border-color: var(--surface-2);
+  color: var(--muted);
+}
+
+.ad-tips ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+}
+
+.ad-error {
+  color: #b3261e;
+}
+html[data-theme="night"] .ad-error {
+  color: #f2a7a0;
+}
+.ad-status {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 60;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .ad-two {
+    grid-template-columns: 1fr;
+  }
+  .ad-row {
+    flex-wrap: wrap;
+  }
+  .ad-kind {
+    width: 100%;
+  }
+  .ad-row .ad-input {
+    flex-basis: 100%;
+  }
+}

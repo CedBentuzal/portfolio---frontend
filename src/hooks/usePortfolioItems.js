@@ -15,7 +15,7 @@ const removedCategories = ["static-visuals", "brand"]
 export const categoryLabel = (id) =>
   portfolioCategories.find((category) => category.id === id)?.label || ""
 
-const resolveCategory = (rawCategory) => {
+export const resolveCategory = (rawCategory) => {
   if (removedCategories.includes(rawCategory)) return null
   return (
     portfolioCategories.find((category) => category.id === rawCategory)?.id ||
@@ -23,7 +23,7 @@ const resolveCategory = (rawCategory) => {
   )
 }
 
-const parsePortfolioMeta = (name = "") => {
+export const parsePortfolioMeta = (name = "") => {
   const baseName = name.split("/").pop() || name
   const parts = baseName.split("__")
 
@@ -40,7 +40,7 @@ const parsePortfolioMeta = (name = "") => {
 }
 
 // "1739000000000_my-cool_video" -> "my cool video"
-const cleanTitle = (value = "") =>
+export const cleanTitle = (value = "") =>
   value
     .replace(/^\d{10,}_/, "")
     .replace(/\.[a-z0-9]{2,4}$/i, "")
@@ -95,8 +95,9 @@ const fromCloudinary = (item) => {
   return {
     key: `cloudinary-${item.name}`,
     category,
-    isFeatured: meta.isFeatured,
-    title: cleanTitle(meta.displayName) || "Untitled",
+    createdAt: Date.parse(item.created_at) || 0,
+    // The title typed in the admin panel wins; the file name is the fallback.
+    title: (item.title || "").trim() || cleanTitle(meta.displayName) || "Untitled",
     kindLabel: type === "image" ? "Image" : "Video",
     type,
     src: item.src,
@@ -111,7 +112,7 @@ const fromExternal = (link) => {
   const base = {
     key: `external-${link.id}`,
     category,
-    isFeatured: Boolean(link.isFeatured),
+    createdAt: Number(link.createdAt) || 0,
   }
 
   if (kind === "image") {
@@ -152,7 +153,7 @@ const fetchItems = async (path) => {
   return (data.items || []).filter(Boolean)
 }
 
-// Loads uploads + external links and returns one flat list, featured first.
+// Loads uploads + external links and returns one flat list, newest first.
 export default function usePortfolioItems() {
   const [remoteItems, setRemoteItems] = useState([])
   const [externalLinks, setExternalLinks] = useState([])
@@ -179,11 +180,9 @@ export default function usePortfolioItems() {
   }, [])
 
   const items = useMemo(() => {
-    const all = [
-      ...externalLinks.map(fromExternal),
-      ...remoteItems.map(fromCloudinary),
-    ].filter(Boolean)
-    return [...all.filter((item) => item.isFeatured), ...all.filter((item) => !item.isFeatured)]
+    return [...externalLinks.map(fromExternal), ...remoteItems.map(fromCloudinary)]
+      .filter(Boolean)
+      .sort((a, b) => b.createdAt - a.createdAt)
   }, [remoteItems, externalLinks])
 
   return { items, isLoading }

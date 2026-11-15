@@ -1,81 +1,139 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
+import ThemeToggle from "../components/ThemeToggle"
+import {
+  cleanTitle,
+  parsePortfolioMeta,
+  portfolioCategories,
+  resolveCategory,
+} from "../hooks/usePortfolioItems"
+import "../admin.css"
 
-const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || ""
-const apiKey = import.meta.env.VITE_CLOUDINARY_API_KEY || ""
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "")
 
-const portfolioCategories = [
-  { id: "motion-saas", label: "Motion and SaaS" },
-  { id: "shorts", label: "Shorts" },
-  { id: "ai-assisted", label: "AI Assisted" },
-  { id: "static-visuals", label: "Static visuals (hidden on site)" },
-  { id: "brand", label: "Brand (hidden on site)" },
+const linkKinds = [
+  { id: "youtube", label: "YouTube" },
+  { id: "vimeo", label: "Vimeo" },
+  { id: "video", label: "Direct video" },
 ]
 
-const parsePortfolioMeta = (name = "") => {
-  const baseName = name.split("/").pop() || name
-  const parts = baseName.split("__")
+const kindLabels = {
+  youtube: "YouTube",
+  vimeo: "Vimeo",
+  video: "Video link",
+  image: "Image link",
+  behance: "Behance",
+}
 
-  if (parts.length >= 3) {
-    const [category, featuredFlag, ...rest] = parts
-    return {
-      category,
-      isFeatured: featuredFlag === "featured",
-      displayName: rest.join("__") || baseName,
-    }
+const readError = async (response, fallback) => {
+  const body = await response.json().catch(() => null)
+  return body?.error?.message || body?.error || fallback
+}
+
+// One uploaded file or link: edit its title, or delete it.
+function ItemRow({ entry, onSaveTitle, onDelete }) {
+  const [title, setTitle] = useState(entry.title)
+  const [isBusy, setIsBusy] = useState(false)
+  const hasChanged = title.trim() !== entry.title
+
+  const save = async (event) => {
+    event.preventDefault()
+    setIsBusy(true)
+    await onSaveTitle(entry, title.trim())
+    setIsBusy(false)
   }
 
-  return {
-    category: "motion-saas",
-    isFeatured: false,
-    displayName: baseName,
+  const remove = async () => {
+    setIsBusy(true)
+    await onDelete(entry)
+    setIsBusy(false)
   }
+
+  return (
+    <form className="ad-row" onSubmit={save}>
+      <span className="ad-kind cd-mono">{entry.kindLabel}</span>
+      <input
+        className="ad-input"
+        type="text"
+        value={title}
+        maxLength={120}
+        aria-label="Title shown on the site"
+        placeholder="Title shown on the site"
+        onChange={(event) => setTitle(event.target.value)}
+      />
+      <button type="submit" className="ad-small" disabled={!hasChanged || isBusy}>
+        Save
+      </button>
+      <button type="button" className="ad-small ad-small--danger" disabled={isBusy} onClick={remove}>
+        Delete
+      </button>
+    </form>
+  )
 }
 
 export default function Admin() {
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [file, setFile] = useState(null)
-  const [status, setStatus] = useState("")
-  const [fileInputKey, setFileInputKey] = useState(0)
   const [authError, setAuthError] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("motion-saas")
-  const [isFeatured, setIsFeatured] = useState(false)
-  const [remoteItems, setRemoteItems] = useState([])
-  const [isLoadingItems, setIsLoadingItems] = useState(false)
-  const [highlightStatus, setHighlightStatus] = useState("")
-  const [highlightSelection, setHighlightSelection] = useState({})
-  const [externalLinks, setExternalLinks] = useState([])
-  const [isLoadingExternal, setIsLoadingExternal] = useState(false)
-  const [externalStatus, setExternalStatus] = useState("")
-  const [externalTitle, setExternalTitle] = useState("")
-  const [externalUrl, setExternalUrl] = useState("")
-  const [externalThumbnail, setExternalThumbnail] = useState("")
-  const [externalCategory, setExternalCategory] = useState("motion-saas")
-  const [externalKind, setExternalKind] = useState("youtube")
+  const [status, setStatus] = useState("")
+
+  const [uploads, setUploads] = useState([])
+  const [links, setLinks] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
+
+  const [file, setFile] = useState(null)
+  const [fileInputKey, setFileInputKey] = useState(0)
+  const [uploadTitle, setUploadTitle] = useState("")
+  const [uploadCategory, setUploadCategory] = useState("motion-saas")
+  const [isUploading, setIsUploading] = useState(false)
+
+  const [linkTitle, setLinkTitle] = useState("")
+  const [linkUrl, setLinkUrl] = useState("")
+  const [linkCategory, setLinkCategory] = useState("motion-saas")
+  const [linkKind, setLinkKind] = useState("youtube")
+
+  const post = useCallback(
+    (path, body) =>
+      fetch(`${backendBaseUrl}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, ...body }),
+      }),
+    [email, password]
+  )
+
+  const loadAll = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const [uploadResponse, linkResponse] = await Promise.all([
+        fetch(`${backendBaseUrl}/api/cloudinary-list`),
+        fetch(`${backendBaseUrl}/api/external-links`),
+      ])
+      if (!uploadResponse.ok || !linkResponse.ok) throw new Error("Unable to load your work.")
+      const [uploadData, linkData] = await Promise.all([uploadResponse.json(), linkResponse.json()])
+      setUploads((uploadData.items || []).filter(Boolean))
+      setLinks((linkData.items || []).filter(Boolean))
+    } catch (error) {
+      setStatus(error.message || "Unable to load your work.")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   const handleLogin = async (event) => {
     event.preventDefault()
     setAuthError("")
     setStatus("Signing in...")
-
     try {
-      const response = await fetch(`${backendBaseUrl}/api/admin-login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      })
-
+      const response = await post("/api/admin-login", {})
       if (!response.ok) {
         setAuthError("Invalid admin credentials.")
         setStatus("")
         return
       }
-
       setIsAuthorized(true)
-      setStatus("Logged in successfully!")
-      setTimeout(() => setStatus(""), 2000)
+      setStatus("")
+      loadAll()
     } catch (error) {
       setAuthError(error.message || "Unable to sign in.")
       setStatus("")
@@ -83,131 +141,43 @@ export default function Admin() {
   }
 
   const handleLogout = () => {
-    setStatus("Signing out...")
     setIsAuthorized(false)
+    setPassword("")
     setStatus("")
   }
 
-  const fetchPortfolioItems = useCallback(async () => {
-    if (!isAuthorized) {
-      return
-    }
+  // Uploads and links in one list per category.
+  const entriesByCategory = useMemo(() => {
+    const grouped = Object.fromEntries(portfolioCategories.map((category) => [category.id, []]))
 
-    setIsLoadingItems(true)
-    try {
-      const response = await fetch(`${backendBaseUrl}/api/cloudinary-list`)
-      if (!response.ok) {
-        throw new Error("Failed to load uploads")
-      }
+    uploads.forEach((item) => {
+      const meta = parsePortfolioMeta(item.name)
+      const category = resolveCategory(meta.category)
+      if (!category) return
+      grouped[category].push({
+        key: `upload-${item.publicId || item.name}`,
+        source: "upload",
+        publicId: item.publicId || `portfolio/${item.name}`,
+        type: item.type,
+        title: (item.title || "").trim() || cleanTitle(meta.displayName),
+        kindLabel: item.type === "image" ? "Image" : "Video",
+      })
+    })
 
-      const data = await response.json()
-      setRemoteItems((data.items || []).filter(Boolean))
-    } catch (error) {
-      setHighlightStatus(error.message || "Unable to load uploads.")
-    } finally {
-      setIsLoadingItems(false)
-    }
-  }, [backendBaseUrl, isAuthorized])
-
-  useEffect(() => {
-    if (isAuthorized) {
-      fetchPortfolioItems()
-    }
-  }, [fetchPortfolioItems, isAuthorized])
-
-  const fetchExternalLinks = useCallback(async () => {
-    if (!isAuthorized) {
-      return
-    }
-
-    setIsLoadingExternal(true)
-    try {
-      const response = await fetch(`${backendBaseUrl}/api/external-links`)
-      if (!response.ok) {
-        throw new Error("Failed to load external links")
-      }
-
-      const data = await response.json()
-      setExternalLinks((data.items || []).filter(Boolean))
-    } catch (error) {
-      setExternalStatus(error.message || "Unable to load external links.")
-    } finally {
-      setIsLoadingExternal(false)
-    }
-  }, [backendBaseUrl, isAuthorized])
-
-  useEffect(() => {
-    if (isAuthorized) {
-      fetchExternalLinks()
-    }
-  }, [fetchExternalLinks, isAuthorized])
-
-  const itemsWithMeta = useMemo(
-    () =>
-      remoteItems.map((item) => {
-        const meta = parsePortfolioMeta(item.name)
-        return {
-          ...item,
-          category: meta.category,
-          isFeatured: meta.isFeatured,
-          displayName: meta.displayName,
-        }
-      }),
-    [remoteItems]
-  )
-
-  const itemsByCategory = useMemo(() => {
-    const grouped = portfolioCategories.reduce((accumulator, category) => {
-      accumulator[category.id] = []
-      return accumulator
-    }, {})
-
-    itemsWithMeta.forEach((item) => {
-      const categoryId =
-        portfolioCategories.find((category) => category.id === item.category)?.id ||
-        "motion-saas"
-      grouped[categoryId].push(item)
+    links.forEach((link) => {
+      const category = resolveCategory(link.category)
+      if (!category) return
+      grouped[category].push({
+        key: `link-${link.id}`,
+        source: "link",
+        id: link.id,
+        title: link.title || link.url || "",
+        kindLabel: kindLabels[link.kind] || "Link",
+      })
     })
 
     return grouped
-  }, [itemsWithMeta])
-
-  const externalLinksByCategory = useMemo(() => {
-    return externalLinks.reduce((accumulator, link) => {
-      const categoryId =
-        portfolioCategories.find((category) => category.id === link.category)?.id ||
-        "motion-saas"
-      if (!accumulator[categoryId]) {
-        accumulator[categoryId] = []
-      }
-      accumulator[categoryId].push(link)
-      return accumulator
-    }, {})
-  }, [externalLinks])
-
-  useEffect(() => {
-    if (!isAuthorized) {
-      return
-    }
-
-    setHighlightSelection((prev) => {
-      let hasChanges = false
-      const next = { ...prev }
-
-      portfolioCategories.forEach((category) => {
-        const items = itemsByCategory[category.id] || []
-        const featuredItem = items.find((item) => item.isFeatured)
-
-        if (!next[category.id]) {
-          next[category.id] =
-            featuredItem?.publicId || items[0]?.publicId || items[0]?.name || ""
-          hasChanges = true
-        }
-      })
-
-      return hasChanges ? next : prev
-    })
-  }, [isAuthorized, itemsByCategory])
+  }, [uploads, links])
 
   const handleUpload = async (event) => {
     event.preventDefault()
@@ -216,1083 +186,357 @@ export default function Admin() {
       return
     }
 
-    if (!isAuthorized) {
-      setStatus("Please sign in first.")
-      return
-    }
-
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
-    const categorySlug = selectedCategory || "motion-saas"
-    const featuredFlag = isFeatured ? "featured" : "standard"
-    const publicId = `${categorySlug}__${featuredFlag}__${Date.now()}_${safeName}`
+    const publicId = `${uploadCategory}__standard__${Date.now()}_${safeName}`
+    const title = uploadTitle.trim()
 
+    setIsUploading(true)
     setStatus("Uploading...")
     try {
-      const signatureResponse = await fetch(`${backendBaseUrl}/api/cloudinary-signature`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          folder: "portfolio",
-          publicId,
-        }),
+      const signatureResponse = await post("/api/cloudinary-signature", {
+        folder: "portfolio",
+        publicId,
       })
-
       if (!signatureResponse.ok) {
-        setStatus("Upload failed: Unauthorized.")
+        setStatus(`Upload failed: ${await readError(signatureResponse, "Unauthorized.")}`)
         return
       }
-
       const signatureData = await signatureResponse.json()
-      const uploadCloudName = signatureData.cloudName || cloudName
-      const uploadApiKey = signatureData.apiKey || apiKey
 
-      if (!uploadCloudName || !uploadApiKey) {
-        setStatus("Upload failed: Missing Cloudinary config.")
-        return
-      }
-
-      const uploadUrl = `https://api.cloudinary.com/v1_1/${uploadCloudName}/auto/upload`
       const formData = new FormData()
       formData.append("file", file)
-      formData.append("api_key", uploadApiKey)
+      formData.append("api_key", signatureData.apiKey)
       formData.append("timestamp", signatureData.timestamp)
       formData.append("signature", signatureData.signature)
       formData.append("folder", "portfolio")
       formData.append("public_id", publicId)
 
-      const uploadResponse = await fetch(uploadUrl, {
-        method: "POST",
-        body: formData,
-      })
-
+      const uploadResponse = await fetch(
+        `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/auto/upload`,
+        { method: "POST", body: formData }
+      )
       if (!uploadResponse.ok) {
-        const errorBody = await uploadResponse.json().catch(() => null)
-        const errorMessage = errorBody?.error?.message || "Upload error"
-        setStatus(`Upload failed: ${errorMessage}`)
+        setStatus(`Upload failed: ${await readError(uploadResponse, "Upload error")}`)
         return
       }
+      const uploaded = await uploadResponse.json()
+
+      let titleProblem = ""
+      if (title) {
+        const titleResponse = await post("/api/cloudinary-update-title", {
+          publicId: uploaded.public_id,
+          resourceType: uploaded.resource_type,
+          title,
+        })
+        if (!titleResponse.ok) {
+          titleProblem = await readError(titleResponse, "Unable to save title.")
+        }
+      }
+
+      setStatus(
+        titleProblem
+          ? `Uploaded, but the title was not saved: ${titleProblem}`
+          : "✓ Upload complete!"
+      )
+      setFile(null)
+      setUploadTitle("")
+      setFileInputKey((previous) => previous + 1)
+      loadAll()
     } catch (error) {
       setStatus(`Upload failed: ${error.message || "Upload error"}`)
-      return
-    }
-
-    setStatus("✓ Upload complete!")
-    setTimeout(() => setStatus(""), 3000)
-    setFile(null)
-    setIsFeatured(false)
-    setFileInputKey((prev) => prev + 1)
-    fetchPortfolioItems()
-  }
-
-  const handleSetHighlight = async (categoryId) => {
-    if (!isAuthorized) {
-      setHighlightStatus("Please sign in first.")
-      return
-    }
-
-    const publicId = highlightSelection[categoryId]
-    if (!publicId) {
-      setHighlightStatus("Please choose an item to highlight.")
-      return
-    }
-
-    const selectedItem = (itemsByCategory[categoryId] || []).find(
-      (item) => item.publicId === publicId || item.name === publicId
-    )
-
-    setHighlightStatus("Updating highlight...")
-    try {
-      const response = await fetch(`${backendBaseUrl}/api/cloudinary-update-featured`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          category: categoryId,
-          publicId,
-          resourceType: selectedItem?.type,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => null)
-        const errorMessage = errorBody?.error || "Unable to update highlight."
-        setHighlightStatus(`Update failed: ${errorMessage}`)
-        return
-      }
-
-      setHighlightStatus("✓ Highlight updated!")
-      setTimeout(() => setHighlightStatus(""), 3000)
-      fetchPortfolioItems()
-    } catch (error) {
-      setHighlightStatus(`Update failed: ${error.message || "Update error"}`)
+    } finally {
+      setIsUploading(false)
     }
   }
 
-  const handleDeleteItem = async (categoryId) => {
-    if (!isAuthorized) {
-      setHighlightStatus("Please sign in first.")
-      return
-    }
-
-    const publicId = highlightSelection[categoryId]
-    if (!publicId) {
-      setHighlightStatus("Please choose an item to delete.")
-      return
-    }
-
-    const selectedItem = (itemsByCategory[categoryId] || []).find(
-      (item) => item.publicId === publicId || item.name === publicId
-    )
-
-    const displayName = selectedItem?.displayName || selectedItem?.name || publicId
-    const confirmed = window.confirm(`Delete "${displayName}"? This cannot be undone.`)
-    if (!confirmed) {
-      return
-    }
-
-    setHighlightStatus("Deleting...")
-    try {
-      const response = await fetch(`${backendBaseUrl}/api/cloudinary-delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          publicId,
-          resourceType: selectedItem?.type,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => null)
-        const errorMessage = errorBody?.error || "Unable to delete item."
-        setHighlightStatus(`Delete failed: ${errorMessage}`)
-        return
-      }
-
-      setHighlightStatus("✓ Item deleted!")
-      setTimeout(() => setHighlightStatus(""), 3000)
-      fetchPortfolioItems()
-    } catch (error) {
-      setHighlightStatus(`Delete failed: ${error.message || "Delete error"}`)
-    }
-  }
-
-  const handleAddExternalLink = async (event) => {
+  const handleAddLink = async (event) => {
     event.preventDefault()
-    if (!isAuthorized) {
-      setExternalStatus("Please sign in first.")
+    if (!linkUrl.trim()) {
+      setStatus("Please enter a URL.")
       return
     }
 
-    if (!externalUrl.trim()) {
-      setExternalStatus("Please enter a URL.")
-      return
-    }
-
-    setExternalStatus("Saving link...")
+    setStatus("Saving link...")
     try {
-      const response = await fetch(`${backendBaseUrl}/api/external-links`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          action: "create",
-          title: externalTitle.trim(),
-          url: externalUrl.trim(),
-          thumbnailUrl: externalThumbnail.trim(),
-          category: externalCategory,
-          kind: externalKind,
-        }),
+      const response = await post("/api/external-links", {
+        action: "create",
+        title: linkTitle.trim(),
+        url: linkUrl.trim(),
+        category: linkCategory,
+        kind: linkKind,
       })
-
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => null)
-        const errorMessage = errorBody?.error || "Unable to save link."
-        setExternalStatus(`Save failed: ${errorMessage}`)
+        setStatus(`Save failed: ${await readError(response, "Unable to save link.")}`)
         return
       }
-
-      setExternalStatus("✓ Link saved!")
-      setTimeout(() => setExternalStatus(""), 3000)
-      setExternalTitle("")
-      setExternalUrl("")
-      setExternalThumbnail("")
-      fetchExternalLinks()
+      setStatus("✓ Link saved!")
+      setLinkTitle("")
+      setLinkUrl("")
+      loadAll()
     } catch (error) {
-      setExternalStatus(`Save failed: ${error.message || "Save error"}`)
+      setStatus(`Save failed: ${error.message || "Save error"}`)
     }
   }
 
-  const handleDeleteExternalLink = async (id) => {
-    if (!isAuthorized) {
-      setExternalStatus("Please sign in first.")
+  const handleSaveTitle = async (entry, title) => {
+    if (entry.source === "link" && !title) {
+      setStatus("A link needs a title.")
       return
     }
 
-    if (!id) {
-      setExternalStatus("Please choose a link to delete.")
-      return
-    }
-
-    const confirmed = window.confirm("Delete this external link?")
-    if (!confirmed) {
-      return
-    }
-
-    setExternalStatus("Deleting link...")
+    setStatus("Saving title...")
     try {
-      const response = await fetch(`${backendBaseUrl}/api/external-links`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          action: "delete",
-          id,
-        }),
-      })
-
+      const response =
+        entry.source === "upload"
+          ? await post("/api/cloudinary-update-title", {
+              publicId: entry.publicId,
+              resourceType: entry.type,
+              title,
+            })
+          : await post("/api/external-links", { action: "update", id: entry.id, title })
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => null)
-        const errorMessage = errorBody?.error || "Unable to delete link."
-        setExternalStatus(`Delete failed: ${errorMessage}`)
+        setStatus(`Title not saved: ${await readError(response, "Unable to save title.")}`)
         return
       }
-
-      setExternalStatus("✓ Link deleted!")
-      setTimeout(() => setExternalStatus(""), 3000)
-      fetchExternalLinks()
+      setStatus("✓ Title saved!")
+      await loadAll()
     } catch (error) {
-      setExternalStatus(`Delete failed: ${error.message || "Delete error"}`)
+      setStatus(`Title not saved: ${error.message || "Save error"}`)
     }
   }
 
-  const handleFeatureExternalLink = async (id, categoryId, setFeatured) => {
-    if (!isAuthorized) {
-      setExternalStatus("Please sign in first.")
-      return
-    }
+  const handleDelete = async (entry) => {
+    const confirmed = window.confirm(`Delete "${entry.title || "this item"}"? This cannot be undone.`)
+    if (!confirmed) return
 
-    if (!categoryId) {
-      setExternalStatus("Missing category for this link.")
-      return
-    }
-
-    setExternalStatus("Updating front card...")
+    setStatus("Deleting...")
     try {
-      const response = await fetch(`${backendBaseUrl}/api/external-links`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          action: "feature",
-          id,
-          category: categoryId,
-          setFeatured,
-        }),
-      })
-
+      const response =
+        entry.source === "upload"
+          ? await post("/api/cloudinary-delete", {
+              publicId: entry.publicId,
+              resourceType: entry.type,
+            })
+          : await post("/api/external-links", { action: "delete", id: entry.id })
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => null)
-        const errorMessage = errorBody?.error || "Unable to update front card."
-        setExternalStatus(`Update failed: ${errorMessage}`)
+        setStatus(`Delete failed: ${await readError(response, "Unable to delete.")}`)
         return
       }
-
-      setExternalStatus("✓ Front card updated!")
-      setTimeout(() => setExternalStatus(""), 3000)
-      fetchExternalLinks()
+      setStatus("✓ Deleted!")
+      await loadAll()
     } catch (error) {
-      setExternalStatus(`Update failed: ${error.message || "Update error"}`)
+      setStatus(`Delete failed: ${error.message || "Delete error"}`)
     }
   }
+
+  const categoryOptions = portfolioCategories.map((category) => (
+    <option key={category.id} value={category.id}>
+      {category.label}
+    </option>
+  ))
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "40px 20px",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "520px",
-          background: "white",
-          borderRadius: "16px",
-          boxShadow: "0 10px 40px rgba(0, 0, 0, 0.1)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            background:
-              "linear-gradient(135deg, rgb(0, 141, 229) 0%, rgb(0, 100, 180) 100%)",
-            padding: "32px",
-            textAlign: "center",
-            position: "relative",
-          }}
-        >
-          <h1
-            style={{
-              font: "400 40px/48px Jaro, sans-serif",
-              color: "white",
-              margin: "0 0 8px 0",
-              letterSpacing: "0.5px",
-            }}
-          >
-            Admin Panel
-          </h1>
-          <p
-            style={{
-              font: "400 16px/24px Quicksand, sans-serif",
-              color: "rgba(255, 255, 255, 0.9)",
-              margin: 0,
-            }}
-          >
-            {isAuthorized ? `Welcome, ${email || "Admin"}` : "Portfolio Management"}
-          </p>
-          {isAuthorized && (
-            <button
-              onClick={handleLogout}
-              style={{
-                position: "absolute",
-                top: "16px",
-                right: "16px",
-                background: "rgba(255, 255, 255, 0.2)",
-                border: "1px solid rgba(255, 255, 255, 0.3)",
-                color: "white",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                font: "600 14px/20px Quicksand, sans-serif",
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.3)"
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)"
-              }}
-            >
-              Logout
+    <div className="cd-site ad-page">
+      <div className="ad-wrap">
+        <header className="ad-header">
+          <div>
+            <a className="cd-mono cd-muted" href="/">
+              ← Back to site
+            </a>
+            <h1 className="cd-h2">Admin</h1>
+          </div>
+          <div className="ad-header-actions">
+            <ThemeToggle />
+            {isAuthorized && (
+              <button type="button" className="cd-btn cd-btn--ghost" onClick={handleLogout}>
+                Log out
+              </button>
+            )}
+          </div>
+        </header>
+
+        {!isAuthorized ? (
+          <form className="ad-card" onSubmit={handleLogin}>
+            <h2 className="cd-h3">Sign in</h2>
+            <label className="ad-field">
+              <span className="cd-mono cd-muted">Email</span>
+              <input
+                className="ad-input"
+                type="email"
+                value={email}
+                autoComplete="username"
+                required
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </label>
+            <label className="ad-field">
+              <span className="cd-mono cd-muted">Password</span>
+              <input
+                className="ad-input"
+                type="password"
+                value={password}
+                autoComplete="current-password"
+                required
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+            <button type="submit" className="cd-btn">
+              Sign in
             </button>
-          )}
-        </div>
-
-        <div style={{ padding: "32px" }}>
-          {!isAuthorized ? (
-            <form
-              onSubmit={handleLogin}
-              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    font: "700 14px/20px Quicksand, sans-serif",
-                    color: "#333",
-                    marginBottom: "8px",
-                  }}
-                >
-                  Email Address
-                </label>
+            {authError && <p className="ad-error">{authError}</p>}
+          </form>
+        ) : (
+          <>
+            <form className="ad-card" onSubmit={handleUpload}>
+              <h2 className="cd-h3">Add a file</h2>
+              <label className="ad-field">
+                <span className="cd-mono cd-muted">Title shown on the site</span>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    border: "2px solid #e0e0e0",
-                    borderRadius: "8px",
-                    font: "400 16px/24px Quicksand, sans-serif",
-                    transition: "border-color 0.2s",
-                    boxSizing: "border-box",
-                  }}
-                  placeholder="admin@example.com"
-                  required
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = "rgb(0, 141, 229)"
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = "#e0e0e0"
-                  }}
-                />
-              </div>
-
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    font: "700 14px/20px Quicksand, sans-serif",
-                    color: "#333",
-                    marginBottom: "8px",
-                  }}
-                >
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    border: "2px solid #e0e0e0",
-                    borderRadius: "8px",
-                    font: "400 16px/24px Quicksand, sans-serif",
-                    transition: "border-color 0.2s",
-                    boxSizing: "border-box",
-                  }}
-                  placeholder="Enter your password"
-                  required
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = "rgb(0, 141, 229)"
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = "#e0e0e0"
-                  }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                style={{
-                  width: "100%",
-                  padding: "14px",
-                  background: "rgb(0, 141, 229)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "8px",
-                  font: "700 16px/24px Quicksand, sans-serif",
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                  marginTop: "8px",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "rgb(0, 100, 180)"
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "rgb(0, 141, 229)"
-                }}
-              >
-                Sign In
-              </button>
-
-              {authError && (
-                <div
-                  style={{
-                    padding: "12px 16px",
-                    background: "#fee",
-                    border: "1px solid #fcc",
-                    borderRadius: "8px",
-                    font: "400 14px/20px Quicksand, sans-serif",
-                    color: "#c00",
-                  }}
-                >
-                  {authError}
-                </div>
-              )}
-            </form>
-          ) : (
-            <form
-              onSubmit={handleUpload}
-              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    font: "700 14px/20px Quicksand, sans-serif",
-                    color: "#333",
-                    marginBottom: "8px",
-                  }}
-                >
-                  Portfolio Category
-                </label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    border: "2px solid #e0e0e0",
-                    borderRadius: "8px",
-                    font: "400 16px/24px Quicksand, sans-serif",
-                    background: "white",
-                    boxSizing: "border-box",
-                  }}
-                >
-                  <option value="motion-saas">Motion and SaaS</option>
-                  <option value="shorts">Shorts</option>
-                  <option value="ai-assisted">AI Assisted</option>
-                </select>
-              </div>
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  font: "600 14px/20px Quicksand, sans-serif",
-                  color: "#333",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={isFeatured}
-                  onChange={(e) => setIsFeatured(e.target.checked)}
-                />
-                Set as highlighted front card
-              </label>
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    font: "700 14px/20px Quicksand, sans-serif",
-                    color: "#333",
-                    marginBottom: "12px",
-                  }}
-                >
-                  Upload Image or Video
-                </label>
-                <div
-                  style={{
-                    border: "2px dashed #d0d0d0",
-                    borderRadius: "8px",
-                    padding: "24px",
-                    textAlign: "center",
-                    background: "#fafafa",
-                    transition: "all 0.2s",
-                    cursor: "pointer",
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    e.currentTarget.style.borderColor = "rgb(0, 141, 229)"
-                    e.currentTarget.style.background = "#f0f8ff"
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault()
-                    e.currentTarget.style.borderColor = "#d0d0d0"
-                    e.currentTarget.style.background = "#fafafa"
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    e.currentTarget.style.borderColor = "#d0d0d0"
-                    e.currentTarget.style.background = "#fafafa"
-                    const droppedFile = e.dataTransfer.files[0]
-                    if (droppedFile) setFile(droppedFile)
-                  }}
-                >
-                  <input
-                    key={fileInputKey}
-                    type="file"
-                    accept="image/*,video/*"
-                    onChange={(e) => setFile(e.target.files?.[0] || null)}
-                    style={{ display: "none" }}
-                    id="file-input"
-                  />
-                  <label htmlFor="file-input" style={{ cursor: "pointer" }}>
-                    <div
-                      style={{
-                        font: "400 32px/40px Jaro, sans-serif",
-                        color: "rgb(0, 141, 229)",
-                        marginBottom: "8px",
-                      }}
-                    >
-                      📁
-                    </div>
-                    <p
-                      style={{
-                        font: "600 16px/24px Quicksand, sans-serif",
-                        color: "#333",
-                        margin: "0 0 4px 0",
-                      }}
-                    >
-                      {file ? file.name : "Choose or drag file here"}
-                    </p>
-                    <p
-                      style={{
-                        font: "400 14px/20px Quicksand, sans-serif",
-                        color: "#666",
-                        margin: 0,
-                      }}
-                    >
-                      {file
-                        ? `${(file.size / 1024 / 1024).toFixed(2)} MB`
-                        : "Images and videos supported"}
-                    </p>
-                  </label>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={!file}
-                style={{
-                  width: "100%",
-                  padding: "14px",
-                  background: !file ? "#ccc" : "rgb(0, 141, 229)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "8px",
-                  font: "700 16px/24px Quicksand, sans-serif",
-                  cursor: !file ? "not-allowed" : "pointer",
-                  transition: "all 0.2s",
-                }}
-                onMouseOver={(e) => {
-                  if (!file) return
-                  e.currentTarget.style.background = "rgb(0, 100, 180)"
-                }}
-                onMouseOut={(e) => {
-                  if (!file) return
-                  e.currentTarget.style.background = "rgb(0, 141, 229)"
-                }}
-              >
-                Upload to Portfolio
-              </button>
-              <div
-                style={{
-                  marginTop: "8px",
-                  padding: "16px",
-                  borderRadius: "10px",
-                  background: "#f7f9fc",
-                  border: "1px solid #e1e7f0",
-                }}
-              >
-                <p
-                  style={{
-                    font: "700 14px/20px Quicksand, sans-serif",
-                    color: "#333",
-                    margin: "0 0 12px 0",
-                  }}
-                >
-                  Highlight Front Card
-                </p>
-                {isLoadingItems ? (
-                  <p style={{ margin: 0, font: "400 13px/20px Quicksand, sans-serif" }}>
-                    Loading uploads...
-                  </p>
-                ) : (
-                  portfolioCategories.map((category) => {
-                    const items = itemsByCategory[category.id] || []
-                    const featuredItem = items.find((item) => item.isFeatured)
-
-                    return (
-                      <div key={category.id} style={{ marginBottom: "14px" }}>
-                        <label
-                          style={{
-                            display: "block",
-                            font: "600 13px/20px Quicksand, sans-serif",
-                            color: "#333",
-                            marginBottom: "6px",
-                          }}
-                        >
-                          {category.label}
-                        </label>
-                        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                          <select
-                            value={highlightSelection[category.id] || ""}
-                            onChange={(e) =>
-                              setHighlightSelection((prev) => ({
-                                ...prev,
-                                [category.id]: e.target.value,
-                              }))
-                            }
-                            style={{
-                              flex: "1 1 240px",
-                              minWidth: "220px",
-                              maxWidth: "100%",
-                              padding: "10px 12px",
-                              border: "1px solid #d6dbe3",
-                              borderRadius: "8px",
-                              font: "400 14px/20px Quicksand, sans-serif",
-                              background: "white",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {items.length === 0 && <option value="">No uploads yet</option>}
-                            {items.map((item) => (
-                              <option key={item.publicId || item.name} value={item.publicId || item.name}>
-                                {item.displayName || item.name} ({item.type})
-                                {item.isFeatured ? " - current" : ""}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => handleSetHighlight(category.id)}
-                            disabled={items.length === 0}
-                            style={{
-                              padding: "10px 14px",
-                              borderRadius: "8px",
-                              border: "none",
-                              background: items.length === 0 ? "#ccc" : "rgb(0, 141, 229)",
-                              color: "white",
-                              font: "600 13px/18px Quicksand, sans-serif",
-                              cursor: items.length === 0 ? "not-allowed" : "pointer",
-                              flexShrink: 0,
-                            }}
-                          >
-                            Set
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteItem(category.id)}
-                            disabled={items.length === 0}
-                            style={{
-                              padding: "10px 14px",
-                              borderRadius: "8px",
-                              border: "1px solid #e5b8b8",
-                              background: items.length === 0 ? "#f1f1f1" : "#fff5f5",
-                              color: "#b00020",
-                              font: "600 13px/18px Quicksand, sans-serif",
-                              cursor: items.length === 0 ? "not-allowed" : "pointer",
-                              flexShrink: 0,
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                        <p
-                          style={{
-                            margin: "6px 0 0 0",
-                            font: "400 12px/18px Quicksand, sans-serif",
-                            color: "#666",
-                          }}
-                        >
-                          Current: {featuredItem?.displayName || "None"}
-                        </p>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            </form>
-          )}
-
-          {status && (
-            <div
-              style={{
-                marginTop: "20px",
-                padding: "12px 16px",
-                background: status.includes("failed") ? "#fee" : "#e8f5e9",
-                border: `1px solid ${status.includes("failed") ? "#fcc" : "#c8e6c9"}`,
-                borderRadius: "8px",
-                font: "400 14px/20px Quicksand, sans-serif",
-                color: status.includes("failed") ? "#c00" : "#2e7d32",
-                textAlign: "center",
-              }}
-            >
-              {status}
-            </div>
-          )}
-
-          {highlightStatus && (
-            <div
-              style={{
-                marginTop: "16px",
-                padding: "12px 16px",
-                background: highlightStatus.includes("failed") ? "#fee" : "#e8f5e9",
-                border: `1px solid ${highlightStatus.includes("failed") ? "#fcc" : "#c8e6c9"}`,
-                borderRadius: "8px",
-                font: "400 14px/20px Quicksand, sans-serif",
-                color: highlightStatus.includes("failed") ? "#c00" : "#2e7d32",
-                textAlign: "center",
-              }}
-            >
-              {highlightStatus}
-            </div>
-          )}
-
-          {isAuthorized && (
-            <div
-              style={{
-                marginTop: "24px",
-                padding: "16px",
-                background: "#f7f9fc",
-                borderRadius: "10px",
-                border: "1px solid #e1e7f0",
-              }}
-            >
-              <p
-                style={{
-                  font: "700 14px/20px Quicksand, sans-serif",
-                  color: "#333",
-                  margin: "0 0 12px 0",
-                }}
-              >
-                External Links
-              </p>
-              <form
-                onSubmit={handleAddExternalLink}
-                style={{ display: "flex", flexDirection: "column", gap: "12px" }}
-              >
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                  <select
-                    value={externalCategory}
-                    onChange={(e) => setExternalCategory(e.target.value)}
-                    style={{
-                      flex: "1 1 180px",
-                      padding: "10px 12px",
-                      border: "1px solid #d6dbe3",
-                      borderRadius: "8px",
-                      font: "400 14px/20px Quicksand, sans-serif",
-                      background: "white",
-                    }}
-                  >
-                    <option value="motion-saas">Motion and SaaS</option>
-                    <option value="shorts">Shorts</option>
-                    <option value="ai-assisted">AI Assisted</option>
-                  </select>
-                  <select
-                    value={externalKind}
-                    onChange={(e) => setExternalKind(e.target.value)}
-                    style={{
-                      flex: "1 1 160px",
-                      padding: "10px 12px",
-                      border: "1px solid #d6dbe3",
-                      borderRadius: "8px",
-                      font: "400 14px/20px Quicksand, sans-serif",
-                      background: "white",
-                    }}
-                  >
-                    <option value="youtube">YouTube</option>
-                    <option value="vimeo">Vimeo</option>
-                    <option value="video">Direct Video</option>
-                    <option value="image">Image</option>
-                    <option value="behance">Behance</option>
-                  </select>
-                </div>
-                <input
+                  className="ad-input"
                   type="text"
-                  value={externalTitle}
-                  onChange={(e) => setExternalTitle(e.target.value)}
-                  placeholder="Title (optional)"
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    border: "1px solid #d6dbe3",
-                    borderRadius: "8px",
-                    font: "400 14px/20px Quicksand, sans-serif",
-                    boxSizing: "border-box",
-                  }}
+                  value={uploadTitle}
+                  maxLength={120}
+                  placeholder="Example: Product launch animation"
+                  onChange={(event) => setUploadTitle(event.target.value)}
                 />
+              </label>
+              <label className="ad-field">
+                <span className="cd-mono cd-muted">Category</span>
+                <select
+                  className="ad-input"
+                  value={uploadCategory}
+                  onChange={(event) => setUploadCategory(event.target.value)}
+                >
+                  {categoryOptions}
+                </select>
+              </label>
+              <label
+                className="ad-drop"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  const droppedFile = event.dataTransfer.files[0]
+                  if (droppedFile) setFile(droppedFile)
+                }}
+              >
                 <input
+                  key={fileInputKey}
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={(event) => setFile(event.target.files?.[0] || null)}
+                />
+                <span className="cd-title">{file ? file.name : "Choose or drag a file here"}</span>
+                <span className="cd-muted">
+                  {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : "Video or image"}
+                </span>
+              </label>
+              <button type="submit" className="cd-btn" disabled={!file || isUploading}>
+                {isUploading ? "Uploading..." : "Upload"}
+              </button>
+            </form>
+
+            <form className="ad-card" onSubmit={handleAddLink}>
+              <h2 className="cd-h3">Add a video link</h2>
+              <label className="ad-field">
+                <span className="cd-mono cd-muted">Title shown on the site</span>
+                <input
+                  className="ad-input"
+                  type="text"
+                  value={linkTitle}
+                  maxLength={120}
+                  placeholder="Example: Explainer for a client"
+                  onChange={(event) => setLinkTitle(event.target.value)}
+                />
+              </label>
+              <div className="ad-two">
+                <label className="ad-field">
+                  <span className="cd-mono cd-muted">Category</span>
+                  <select
+                    className="ad-input"
+                    value={linkCategory}
+                    onChange={(event) => setLinkCategory(event.target.value)}
+                  >
+                    {categoryOptions}
+                  </select>
+                </label>
+                <label className="ad-field">
+                  <span className="cd-mono cd-muted">Type</span>
+                  <select
+                    className="ad-input"
+                    value={linkKind}
+                    onChange={(event) => setLinkKind(event.target.value)}
+                  >
+                    {linkKinds.map((kind) => (
+                      <option key={kind.id} value={kind.id}>
+                        {kind.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label className="ad-field">
+                <span className="cd-mono cd-muted">URL</span>
+                <input
+                  className="ad-input"
                   type="url"
-                  value={externalUrl}
-                  onChange={(e) => setExternalUrl(e.target.value)}
+                  value={linkUrl}
                   placeholder="https://..."
                   required
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    border: "1px solid #d6dbe3",
-                    borderRadius: "8px",
-                    font: "400 14px/20px Quicksand, sans-serif",
-                    boxSizing: "border-box",
-                  }}
+                  onChange={(event) => setLinkUrl(event.target.value)}
                 />
-                {externalKind === "behance" && (
-                  <input
-                    type="url"
-                    value={externalThumbnail}
-                    onChange={(e) => setExternalThumbnail(e.target.value)}
-                    placeholder="Thumbnail image URL (optional)"
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      border: "1px solid #d6dbe3",
-                      borderRadius: "8px",
-                      font: "400 14px/20px Quicksand, sans-serif",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                )}
-                <button
-                  type="submit"
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: "rgb(0, 141, 229)",
-                    color: "white",
-                    font: "600 13px/18px Quicksand, sans-serif",
-                    cursor: "pointer",
-                  }}
-                >
-                  Add External Link
-                </button>
-              </form>
-              <div style={{ marginTop: "16px" }}>
-                {isLoadingExternal ? (
-                  <p style={{ margin: 0, font: "400 13px/20px Quicksand, sans-serif" }}>
-                    Loading external links...
-                  </p>
-                ) : (
-                  portfolioCategories.map((category) => {
-                    const links = externalLinksByCategory[category.id] || []
+              </label>
+              <button type="submit" className="cd-btn">
+                Add link
+              </button>
+            </form>
 
-                    return (
-                      <div key={category.id} style={{ marginBottom: "12px" }}>
-                        <p
-                          style={{
-                            font: "600 13px/20px Quicksand, sans-serif",
-                            color: "#333",
-                            margin: "0 0 6px 0",
-                          }}
-                        >
-                          {category.label}
-                        </p>
-                        {links.length === 0 ? (
-                          <p style={{ margin: 0, font: "400 12px/18px Quicksand, sans-serif" }}>
-                            No external links yet.
-                          </p>
-                        ) : (
-                          links.map((link) => (
-                            <div
-                              key={link.id}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "10px",
-                                marginBottom: "6px",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  flex: 1,
-                                  font: "400 12px/18px Quicksand, sans-serif",
-                                  color: "#444",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {link.title || link.url} ({link.kind})
-                              </span>
-                              {link.isFeatured && (
-                                <span
-                                  style={{
-                                    padding: "2px 6px",
-                                    borderRadius: "6px",
-                                    background: "#e8f5e9",
-                                    border: "1px solid #c8e6c9",
-                                    color: "#2e7d32",
-                                    font: "600 10px/14px Quicksand, sans-serif",
-                                  }}
-                                >
-                                  Front card
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleFeatureExternalLink(
-                                    link.id,
-                                    category.id,
-                                    !link.isFeatured
-                                  )
-                                }
-                                style={{
-                                  padding: "6px 10px",
-                                  borderRadius: "6px",
-                                  border: "1px solid #c7d5f5",
-                                  background: "#f1f5ff",
-                                  color: "#1b4ea3",
-                                  font: "600 11px/16px Quicksand, sans-serif",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                {link.isFeatured ? "Clear front" : "Set front"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteExternalLink(link.id)}
-                                style={{
-                                  padding: "6px 10px",
-                                  borderRadius: "6px",
-                                  border: "1px solid #e5b8b8",
-                                  background: "#fff5f5",
-                                  color: "#b00020",
-                                  font: "600 11px/16px Quicksand, sans-serif",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-              {externalStatus && (
-                <div
-                  style={{
-                    marginTop: "12px",
-                    padding: "10px 12px",
-                    background: externalStatus.includes("failed") ? "#fee" : "#e8f5e9",
-                    border: `1px solid ${externalStatus.includes("failed") ? "#fcc" : "#c8e6c9"}`,
-                    borderRadius: "8px",
-                    font: "400 13px/20px Quicksand, sans-serif",
-                    color: externalStatus.includes("failed") ? "#c00" : "#2e7d32",
-                    textAlign: "center",
-                  }}
-                >
-                  {externalStatus}
-                </div>
+            <section className="ad-card">
+              <h2 className="cd-h3">Your work</h2>
+              <p className="cd-muted">Change a title and press Save. The site shows the new title.</p>
+              {isLoading && uploads.length === 0 && links.length === 0 ? (
+                <p className="cd-muted">Loading...</p>
+              ) : (
+                portfolioCategories.map((category) => {
+                  const entries = entriesByCategory[category.id] || []
+                  return (
+                    <div key={category.id} className="ad-group">
+                      <span className="cd-mono cd-muted">
+                        {category.label} ({entries.length})
+                      </span>
+                      {entries.length === 0 ? (
+                        <p className="cd-muted">Nothing here yet.</p>
+                      ) : (
+                        entries.map((entry) => (
+                          <ItemRow
+                            key={entry.key}
+                            entry={entry}
+                            onSaveTitle={handleSaveTitle}
+                            onDelete={handleDelete}
+                          />
+                        ))
+                      )}
+                    </div>
+                  )
+                })
               )}
-            </div>
-          )}
+            </section>
 
-          {isAuthorized && (
-            <div
-              style={{
-                marginTop: "24px",
-                padding: "16px",
-                background: "#f5f5f5",
-                borderRadius: "8px",
-                borderLeft: "4px solid rgb(0, 141, 229)",
-              }}
-            >
-              <p
-                style={{
-                  font: "600 14px/20px Quicksand, sans-serif",
-                  color: "#333",
-                  margin: "0 0 8px 0",
-                }}
-              >
-                💡 Tips
-              </p>
-              <ul
-                style={{
-                  font: "400 13px/20px Quicksand, sans-serif",
-                  color: "#666",
-                  margin: 0,
-                  paddingLeft: "20px",
-                }}
-              >
-                <li>Files stored in Cloudinary under "portfolio/"</li>
-                <li>Supported: JPG, PNG, MP4, WebM, MOV</li>
+            <section className="ad-card ad-tips">
+              <span className="cd-mono cd-muted">Tips</span>
+              <ul>
+                <li>Files are stored in Cloudinary under "portfolio/".</li>
+                <li>Supported: JPG, PNG, MP4, WebM, MOV.</li>
+                <li>If you leave the title empty, the site shows the file name.</li>
               </ul>
-            </div>
-          )}
-        </div>
+            </section>
+          </>
+        )}
+
+        {status && (
+          <p className="ad-status" role="status">
+            {status}
+          </p>
+        )}
       </div>
     </div>
   )
