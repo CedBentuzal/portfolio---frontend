@@ -7,7 +7,9 @@ const backendBaseUrl = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "
 const portfolioCategories = [
   { id: "motion-saas", label: "Motion and SaaS" },
   { id: "shorts", label: "Shorts" },
-  { id: "static-visuals", label: "Static visuals" },
+  { id: "ai-assisted", label: "AI Assisted" },
+  { id: "static-visuals", label: "Static visuals (hidden on site)" },
+  { id: "brand", label: "Brand (hidden on site)" },
 ]
 
 const parsePortfolioMeta = (name = "") => {
@@ -44,6 +46,14 @@ export default function Admin() {
   const [isLoadingItems, setIsLoadingItems] = useState(false)
   const [highlightStatus, setHighlightStatus] = useState("")
   const [highlightSelection, setHighlightSelection] = useState({})
+  const [externalLinks, setExternalLinks] = useState([])
+  const [isLoadingExternal, setIsLoadingExternal] = useState(false)
+  const [externalStatus, setExternalStatus] = useState("")
+  const [externalTitle, setExternalTitle] = useState("")
+  const [externalUrl, setExternalUrl] = useState("")
+  const [externalThumbnail, setExternalThumbnail] = useState("")
+  const [externalCategory, setExternalCategory] = useState("motion-saas")
+  const [externalKind, setExternalKind] = useState("youtube")
 
   const handleLogin = async (event) => {
     event.preventDefault()
@@ -105,6 +115,33 @@ export default function Admin() {
     }
   }, [fetchPortfolioItems, isAuthorized])
 
+  const fetchExternalLinks = useCallback(async () => {
+    if (!isAuthorized) {
+      return
+    }
+
+    setIsLoadingExternal(true)
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/external-links`)
+      if (!response.ok) {
+        throw new Error("Failed to load external links")
+      }
+
+      const data = await response.json()
+      setExternalLinks((data.items || []).filter(Boolean))
+    } catch (error) {
+      setExternalStatus(error.message || "Unable to load external links.")
+    } finally {
+      setIsLoadingExternal(false)
+    }
+  }, [backendBaseUrl, isAuthorized])
+
+  useEffect(() => {
+    if (isAuthorized) {
+      fetchExternalLinks()
+    }
+  }, [fetchExternalLinks, isAuthorized])
+
   const itemsWithMeta = useMemo(
     () =>
       remoteItems.map((item) => {
@@ -134,6 +171,19 @@ export default function Admin() {
 
     return grouped
   }, [itemsWithMeta])
+
+  const externalLinksByCategory = useMemo(() => {
+    return externalLinks.reduce((accumulator, link) => {
+      const categoryId =
+        portfolioCategories.find((category) => category.id === link.category)?.id ||
+        "motion-saas"
+      if (!accumulator[categoryId]) {
+        accumulator[categoryId] = []
+      }
+      accumulator[categoryId].push(link)
+      return accumulator
+    }, {})
+  }, [externalLinks])
 
   useEffect(() => {
     if (!isAuthorized) {
@@ -328,6 +378,138 @@ export default function Admin() {
       fetchPortfolioItems()
     } catch (error) {
       setHighlightStatus(`Delete failed: ${error.message || "Delete error"}`)
+    }
+  }
+
+  const handleAddExternalLink = async (event) => {
+    event.preventDefault()
+    if (!isAuthorized) {
+      setExternalStatus("Please sign in first.")
+      return
+    }
+
+    if (!externalUrl.trim()) {
+      setExternalStatus("Please enter a URL.")
+      return
+    }
+
+    setExternalStatus("Saving link...")
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/external-links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          action: "create",
+          title: externalTitle.trim(),
+          url: externalUrl.trim(),
+          thumbnailUrl: externalThumbnail.trim(),
+          category: externalCategory,
+          kind: externalKind,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null)
+        const errorMessage = errorBody?.error || "Unable to save link."
+        setExternalStatus(`Save failed: ${errorMessage}`)
+        return
+      }
+
+      setExternalStatus("✓ Link saved!")
+      setTimeout(() => setExternalStatus(""), 3000)
+      setExternalTitle("")
+      setExternalUrl("")
+      setExternalThumbnail("")
+      fetchExternalLinks()
+    } catch (error) {
+      setExternalStatus(`Save failed: ${error.message || "Save error"}`)
+    }
+  }
+
+  const handleDeleteExternalLink = async (id) => {
+    if (!isAuthorized) {
+      setExternalStatus("Please sign in first.")
+      return
+    }
+
+    if (!id) {
+      setExternalStatus("Please choose a link to delete.")
+      return
+    }
+
+    const confirmed = window.confirm("Delete this external link?")
+    if (!confirmed) {
+      return
+    }
+
+    setExternalStatus("Deleting link...")
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/external-links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          action: "delete",
+          id,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null)
+        const errorMessage = errorBody?.error || "Unable to delete link."
+        setExternalStatus(`Delete failed: ${errorMessage}`)
+        return
+      }
+
+      setExternalStatus("✓ Link deleted!")
+      setTimeout(() => setExternalStatus(""), 3000)
+      fetchExternalLinks()
+    } catch (error) {
+      setExternalStatus(`Delete failed: ${error.message || "Delete error"}`)
+    }
+  }
+
+  const handleFeatureExternalLink = async (id, categoryId, setFeatured) => {
+    if (!isAuthorized) {
+      setExternalStatus("Please sign in first.")
+      return
+    }
+
+    if (!categoryId) {
+      setExternalStatus("Missing category for this link.")
+      return
+    }
+
+    setExternalStatus("Updating front card...")
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/external-links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          action: "feature",
+          id,
+          category: categoryId,
+          setFeatured,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null)
+        const errorMessage = errorBody?.error || "Unable to update front card."
+        setExternalStatus(`Update failed: ${errorMessage}`)
+        return
+      }
+
+      setExternalStatus("✓ Front card updated!")
+      setTimeout(() => setExternalStatus(""), 3000)
+      fetchExternalLinks()
+    } catch (error) {
+      setExternalStatus(`Update failed: ${error.message || "Update error"}`)
     }
   }
 
@@ -554,7 +736,7 @@ export default function Admin() {
                 >
                   <option value="motion-saas">Motion and SaaS</option>
                   <option value="shorts">Shorts</option>
-                  <option value="static-visuals">Static visuals</option>
+                  <option value="ai-assisted">AI Assisted</option>
                 </select>
               </div>
               <label
@@ -832,6 +1014,249 @@ export default function Admin() {
               }}
             >
               {highlightStatus}
+            </div>
+          )}
+
+          {isAuthorized && (
+            <div
+              style={{
+                marginTop: "24px",
+                padding: "16px",
+                background: "#f7f9fc",
+                borderRadius: "10px",
+                border: "1px solid #e1e7f0",
+              }}
+            >
+              <p
+                style={{
+                  font: "700 14px/20px Quicksand, sans-serif",
+                  color: "#333",
+                  margin: "0 0 12px 0",
+                }}
+              >
+                External Links
+              </p>
+              <form
+                onSubmit={handleAddExternalLink}
+                style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+              >
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  <select
+                    value={externalCategory}
+                    onChange={(e) => setExternalCategory(e.target.value)}
+                    style={{
+                      flex: "1 1 180px",
+                      padding: "10px 12px",
+                      border: "1px solid #d6dbe3",
+                      borderRadius: "8px",
+                      font: "400 14px/20px Quicksand, sans-serif",
+                      background: "white",
+                    }}
+                  >
+                    <option value="motion-saas">Motion and SaaS</option>
+                    <option value="shorts">Shorts</option>
+                    <option value="ai-assisted">AI Assisted</option>
+                  </select>
+                  <select
+                    value={externalKind}
+                    onChange={(e) => setExternalKind(e.target.value)}
+                    style={{
+                      flex: "1 1 160px",
+                      padding: "10px 12px",
+                      border: "1px solid #d6dbe3",
+                      borderRadius: "8px",
+                      font: "400 14px/20px Quicksand, sans-serif",
+                      background: "white",
+                    }}
+                  >
+                    <option value="youtube">YouTube</option>
+                    <option value="vimeo">Vimeo</option>
+                    <option value="video">Direct Video</option>
+                    <option value="image">Image</option>
+                    <option value="behance">Behance</option>
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  value={externalTitle}
+                  onChange={(e) => setExternalTitle(e.target.value)}
+                  placeholder="Title (optional)"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1px solid #d6dbe3",
+                    borderRadius: "8px",
+                    font: "400 14px/20px Quicksand, sans-serif",
+                    boxSizing: "border-box",
+                  }}
+                />
+                <input
+                  type="url"
+                  value={externalUrl}
+                  onChange={(e) => setExternalUrl(e.target.value)}
+                  placeholder="https://..."
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1px solid #d6dbe3",
+                    borderRadius: "8px",
+                    font: "400 14px/20px Quicksand, sans-serif",
+                    boxSizing: "border-box",
+                  }}
+                />
+                {externalKind === "behance" && (
+                  <input
+                    type="url"
+                    value={externalThumbnail}
+                    onChange={(e) => setExternalThumbnail(e.target.value)}
+                    placeholder="Thumbnail image URL (optional)"
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1px solid #d6dbe3",
+                      borderRadius: "8px",
+                      font: "400 14px/20px Quicksand, sans-serif",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                )}
+                <button
+                  type="submit"
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "rgb(0, 141, 229)",
+                    color: "white",
+                    font: "600 13px/18px Quicksand, sans-serif",
+                    cursor: "pointer",
+                  }}
+                >
+                  Add External Link
+                </button>
+              </form>
+              <div style={{ marginTop: "16px" }}>
+                {isLoadingExternal ? (
+                  <p style={{ margin: 0, font: "400 13px/20px Quicksand, sans-serif" }}>
+                    Loading external links...
+                  </p>
+                ) : (
+                  portfolioCategories.map((category) => {
+                    const links = externalLinksByCategory[category.id] || []
+
+                    return (
+                      <div key={category.id} style={{ marginBottom: "12px" }}>
+                        <p
+                          style={{
+                            font: "600 13px/20px Quicksand, sans-serif",
+                            color: "#333",
+                            margin: "0 0 6px 0",
+                          }}
+                        >
+                          {category.label}
+                        </p>
+                        {links.length === 0 ? (
+                          <p style={{ margin: 0, font: "400 12px/18px Quicksand, sans-serif" }}>
+                            No external links yet.
+                          </p>
+                        ) : (
+                          links.map((link) => (
+                            <div
+                              key={link.id}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "10px",
+                                marginBottom: "6px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  flex: 1,
+                                  font: "400 12px/18px Quicksand, sans-serif",
+                                  color: "#444",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {link.title || link.url} ({link.kind})
+                              </span>
+                              {link.isFeatured && (
+                                <span
+                                  style={{
+                                    padding: "2px 6px",
+                                    borderRadius: "6px",
+                                    background: "#e8f5e9",
+                                    border: "1px solid #c8e6c9",
+                                    color: "#2e7d32",
+                                    font: "600 10px/14px Quicksand, sans-serif",
+                                  }}
+                                >
+                                  Front card
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleFeatureExternalLink(
+                                    link.id,
+                                    category.id,
+                                    !link.isFeatured
+                                  )
+                                }
+                                style={{
+                                  padding: "6px 10px",
+                                  borderRadius: "6px",
+                                  border: "1px solid #c7d5f5",
+                                  background: "#f1f5ff",
+                                  color: "#1b4ea3",
+                                  font: "600 11px/16px Quicksand, sans-serif",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {link.isFeatured ? "Clear front" : "Set front"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteExternalLink(link.id)}
+                                style={{
+                                  padding: "6px 10px",
+                                  borderRadius: "6px",
+                                  border: "1px solid #e5b8b8",
+                                  background: "#fff5f5",
+                                  color: "#b00020",
+                                  font: "600 11px/16px Quicksand, sans-serif",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+              {externalStatus && (
+                <div
+                  style={{
+                    marginTop: "12px",
+                    padding: "10px 12px",
+                    background: externalStatus.includes("failed") ? "#fee" : "#e8f5e9",
+                    border: `1px solid ${externalStatus.includes("failed") ? "#fcc" : "#c8e6c9"}`,
+                    borderRadius: "8px",
+                    font: "400 13px/20px Quicksand, sans-serif",
+                    color: externalStatus.includes("failed") ? "#c00" : "#2e7d32",
+                    textAlign: "center",
+                  }}
+                >
+                  {externalStatus}
+                </div>
+              )}
             </div>
           )}
 

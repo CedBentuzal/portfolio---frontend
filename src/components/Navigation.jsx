@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react"
-import hamburgerIcon from "../assets/hamburger.png"
+import ThemeToggle from "./ThemeToggle"
+
+const links = [
+  ["#portfolio", "Work"],
+  ["#ai-assisted", "AI Assisted"],
+  ["#about", "About"],
+  ["#contact", "Contact"],
+]
 
 export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (event.key === "Escape") {
-        setIsOpen(false)
-      }
+      if (event.key === "Escape") setIsOpen(false)
     }
 
     if (isOpen) {
@@ -25,50 +30,37 @@ export default function Navigation() {
   }, [isOpen])
 
   return (
-    <nav
-      className="nav-shell"
-      style={{
-        backdropFilter: "blur(4px)",
-        backgroundColor: "rgba(255, 255, 255, 0.9)",
-        fontWeight: "400",
-        left: "0px",
-        position: "fixed",
-        right: "0px",
-        top: "0px",
-        zIndex: "50",
-      }}
-    >
-      <div className="nav-inner">
-        <a className="nav-logo" href="/admin">
+    <nav className="cd-nav">
+      <div className="cd-wrap cd-nav-inner">
+        <a className="cd-logo" href="/admin">
           Cdbn.Ae
         </a>
 
-        <button
-          type="button"
-          className="nav-toggle"
-          aria-label="Toggle navigation"
-          aria-expanded={isOpen}
-          onClick={() => setIsOpen((prev) => !prev)}
-        >
-          <img
-            src={hamburgerIcon}
-            alt="Menu"
-            className="nav-toggle-icon"
-          />
-        </button>
+        <div className={`cd-nav-links ${isOpen ? "is-open" : ""}`}>
+          {links.map(([href, label]) => (
+            <a key={href} href={href} className="cd-nav-link" onClick={() => setIsOpen(false)}>
+              {label}
+            </a>
+          ))}
+        </div>
 
-        <div className={`nav-links ${isOpen ? "is-open" : ""}`}>
-          <a href="#home" className="nav-link nav-item" onClick={() => setIsOpen(false)}>Home</a>
-          <a href="#about" className="nav-link nav-item" onClick={() => setIsOpen(false)}>About</a>
-          <a href="#portfolio" className="nav-link nav-item" onClick={() => setIsOpen(false)}>Portfolio</a>
-          <a href="#contact" className="nav-link nav-item" onClick={() => setIsOpen(false)}>Contact</a>
+        <div className="cd-nav-actions">
+          <ThemeToggle />
+          <a href="#contact" className="cd-btn">
+            Let's talk
+          </a>
+          <button
+            type="button"
+            className={`cd-burger ${isOpen ? "is-open" : ""}`}
+            aria-label="Toggle navigation"
+            aria-expanded={isOpen}
+            onClick={() => setIsOpen((prev) => !prev)}
+          >
+            <span />
+            <span />
+          </button>
         </div>
       </div>
-
-      <div
-        className={`nav-overlay ${isOpen ? "is-open" : ""}`}
-        onClick={() => setIsOpen(false)}
-      />
     </nav>
   )
 }

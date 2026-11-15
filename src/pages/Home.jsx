@@ -1,12 +1,18 @@
-import { useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Navigation from "../components/Navigation"
 import Hero from "../components/Hero"
 import About from "../components/About"
 import Portfolio from "../components/Portfolio"
+import AiAssisted from "../components/AiAssisted"
 import Contact from "../components/Contact"
-import Footer from "../components/Footer"
+import MediaModal from "../components/MediaModal"
+import usePortfolioItems from "../hooks/usePortfolioItems"
 
 export default function Home() {
+  const { items, isLoading } = usePortfolioItems()
+  const [selectedItem, setSelectedItem] = useState(null)
+  const closeModal = useCallback(() => setSelectedItem(null), [])
+
   const dragState = useRef({
     active: false,
     startX: 0,
@@ -15,6 +21,7 @@ export default function Home() {
     scrollTop: 0,
   })
 
+  // Click and drag anywhere to scroll the page.
   useEffect(() => {
     const state = dragState.current
 
@@ -61,6 +68,7 @@ export default function Home() {
     }
   }, [])
 
+  // Fade each section in the first time it comes on screen.
   useEffect(() => {
     const sections = document.querySelectorAll(".reveal-section")
     const observer = new IntersectionObserver(
@@ -68,12 +76,11 @@ export default function Home() {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             entry.target.classList.add("is-visible")
-          } else {
-            entry.target.classList.remove("is-visible")
+            observer.unobserve(entry.target)
           }
         })
       },
-      { threshold: 0.2 }
+      { threshold: 0.05 }
     )
 
     sections.forEach((section) => observer.observe(section))
@@ -82,13 +89,14 @@ export default function Home() {
   }, [])
 
   return (
-    <div className="bg-white text-gray-900">
+    <div className="cd-site">
       <Navigation />
-      <Hero />
+      <Hero onOpen={setSelectedItem} />
+      <Portfolio items={items} isLoading={isLoading} onOpen={setSelectedItem} />
+      <AiAssisted items={items} onOpen={setSelectedItem} />
       <About />
-      <Portfolio />
       <Contact />
-      <Footer />
+      <MediaModal item={selectedItem} onClose={closeModal} />
     </div>
   )
 }

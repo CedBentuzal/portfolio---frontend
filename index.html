@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="day">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
@@ -7,7 +7,30 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CDBN</title>
+    <meta
+      name="description"
+      content="Ced Bentuzal (CDBN) — motion graphics designer and 2D animator based in the Philippines."
+    />
+    <title>CDBN — Motion Graphics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500&family=Manrope:wght@400;500;600&family=Outfit:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // Pick Day or Night before the page paints (saved choice first, then system setting).
+      (function () {
+        var theme = null
+        try {
+          theme = window.localStorage.getItem("cdbn-theme")
+        } catch (error) {}
+        if (theme !== "day" && theme !== "night") {
+          theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "night" : "day"
+        }
+        document.documentElement.dataset.theme = theme
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

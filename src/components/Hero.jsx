@@ -1,177 +1,68 @@
 import heroVideo from "../assets/animation_1.mp4"
-import characterImage from "../assets/character.png"
+import { PlayIcon } from "./WorkCard"
 
-export default function Hero() {
+const services = ["Motion Graphics", "2D Animation", "Explainer Videos", "AI Assisted"]
+
+export default function Hero({ onOpen = () => {} }) {
   return (
-    <section
-      id="home"
-      className="min-h-screen bg-white reveal-section hero-video-section"
-    >
-      <video
-        className="hero-video"
-        src={heroVideo}
-        autoPlay
-        loop
-        muted
-        playsInline
-      />
-      <main style={{ padding: "128px 24px 80px", position: "relative", zIndex: 1 }}>
-        <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ marginBottom: "32px", position: "relative" }}>
-              <img
-                src={characterImage}
-                alt="Character illustration"
-                style={{ width: "181px", height: "321px", objectFit: "cover" }}
-              />
-            </div>
+    <section id="home" className="reveal-section">
+      <div className="cd-wrap cd-hero">
+        <div className="cd-eyebrow">
+          <span className="cd-dot" />
+          <span className="cd-mono cd-muted">
+            Motion Graphics Designer & 2D Animator — Philippines
+          </span>
+        </div>
 
-            <div style={{ maxWidth: "555px", marginBottom: "48px" }}>
-              <h1
-                className="font-quicksand"
-                style={{
-                  font: "700 32px/40px Quicksand, sans-serif",
-                  color: "rgb(0, 141, 229)",
-                  marginBottom: "8px",
-                }}
-              >
-                Hi, welcome.
-              </h1>
-              <p
-                className="font-quicksand"
-                style={{
-                  font: "500 18px/36px Quicksand, sans-serif",
-                  color: "rgb(36, 36, 36)",
-                  lineHeight: "normal",
-                }}
-              >
-                I'm a student passionate about system development and motion/graphic design,
-                creating both functional apps and eye-catching visuals that bring ideas to life.
-              </p>
-            </div>
+        <h1 className="cd-hero-title">
+          Motion design
+          <br />
+          that <span className="cd-accent">moves</span> people.
+        </h1>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "16px",
-                flexWrap: "wrap",
-                justifyContent: "center",
-              }}
+        <div className="cd-hero-row">
+          <p className="cd-body-l cd-muted">
+            I make clean, clear animation for brands, explainers and YouTube channels — from first
+            idea to final render.
+          </p>
+          <div className="cd-cta">
+            <a href="#portfolio" className="cd-btn">
+              View work
+            </a>
+            <button
+              type="button"
+              className="cd-btn cd-btn--ghost"
+              onClick={() => onOpen({ type: "video", src: heroVideo, title: "Showreel" })}
             >
-              <a
-                href="#contact"
-                className="cta-button"
-                style={{
-                  backgroundColor: "white",
-                  borderRadius: "20px",
-                  padding: "12px 28px",
-                  boxShadow: "0 4px 4.8px rgba(0, 0, 0, 0.41)",
-                  border: "none",
-                  cursor: "pointer",
-                  transition: "box-shadow 0.2s",
-                  textDecoration: "none",
-                }}
-              >
-                <span
-                  className="font-quicksand"
-                  style={{ font: "500 16px/24px Quicksand, sans-serif", color: "black" }}
-                >
-                  Let's connect
-                </span>
-              </a>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                <a
-                  href="https://www.instagram.com/cdbn.ae/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="social-icon"
-                  style={{
-                    width: "34px",
-                    height: "34px",
-                    borderRadius: "50%",
-                    backgroundColor: "#fafafa",
-                    boxShadow: "0 4px 4px rgba(0, 0, 0, 0.35)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "transform 0.2s",
-                    textDecoration: "none",
-                  }}
-                  aria-label="Instagram"
-                >
-                  <img
-                    src="https://api.builder.io/api/v1/image/assets/TEMP/3597ced1db266e3369f1e1a42ee0da17c302c8ea?width=44"
-                    alt=""
-                    style={{ width: "22px", height: "22px" }}
-                  />
-                </a>
-
-                <a
-                  href="https://www.tiktok.com/@ced.ae"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="social-icon"
-                  style={{
-                    width: "34px",
-                    height: "34px",
-                    borderRadius: "50%",
-                    backgroundColor: "#cbcfca",
-                    boxShadow: "0 4px 4px rgba(0, 0, 0, 0.35)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "transform 0.2s",
-                    textDecoration: "none",
-                  }}
-                  aria-label="TikTok"
-                >
-                  <img
-                    src="https://api.builder.io/api/v1/image/assets/TEMP/a82b982e49392695b068d4c89985978294762c08?width=50"
-                    alt=""
-                    style={{ width: "25px", height: "25px" }}
-                  />
-                </a>
-
-                <a
-                  href="https://www.facebook.com/Bentuzal/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="social-icon"
-                  style={{
-                    width: "34px",
-                    height: "34px",
-                    borderRadius: "50%",
-                    backgroundColor: "#989898",
-                    boxShadow: "0 4px 4px rgba(0, 0, 0, 0.35)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "transform 0.2s",
-                    textDecoration: "none",
-                  }}
-                  aria-label="Facebook"
-                >
-                  <img
-                    src="https://api.builder.io/api/v1/image/assets/TEMP/fe1a23548766ea880b5e24889ddf29b9ca33c736?width=46"
-                    alt=""
-                    style={{ width: "23px", height: "23px" }}
-                  />
-                </a>
-              </div>
-            </div>
+              Play showreel
+            </button>
           </div>
         </div>
-      </main>
+
+        <button
+          type="button"
+          className="cd-reel"
+          aria-label="Play showreel"
+          onClick={() => onOpen({ type: "video", src: heroVideo, title: "Showreel" })}
+        >
+          <video src={heroVideo} autoPlay loop muted playsInline />
+          <span className="cd-play">
+            <PlayIcon />
+          </span>
+          <span className="cd-reel-label cd-mono">Showreel</span>
+        </button>
+      </div>
+
+      <div className="cd-strip">
+        <div className="cd-wrap cd-strip-inner">
+          {services.map((service, index) => (
+            <span key={service} style={{ display: "contents" }}>
+              <span className="cd-mono">{service}</span>
+              {index < services.length - 1 && <span className="cd-dot" />}
+            </span>
+          ))}
+        </div>
+      </div>
     </section>
   )
 }
