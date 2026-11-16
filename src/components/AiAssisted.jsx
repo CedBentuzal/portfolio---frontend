@@ -42,8 +42,7 @@ export default function AiAssisted({ items = [], onOpen = () => {} }) {
               </h2>
             </div>
             <p className="cd-body-l cd-muted cd-ai-intro">
-              I use AI tools to move faster on ideas, style frames and assets. Every final frame is
-              still designed and animated by hand.
+              In this section are projects that I used AI tools to move faster on ideas, style frames, assets and animation. 
             </p>
           </div>
 
