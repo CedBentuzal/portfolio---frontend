@@ -5,6 +5,8 @@ import {
   parsePortfolioMeta,
   portfolioCategories,
   resolveCategory,
+  resolveShortsType,
+  shortsTypes,
 } from "../hooks/usePortfolioItems"
 import "../admin.css"
 
@@ -29,16 +31,32 @@ const readError = async (response, fallback) => {
   return body?.error?.message || body?.error || fallback
 }
 
-// One uploaded file or link: edit its title, or delete it.
-function ItemRow({ entry, onSaveTitle, onDelete }) {
+// Dropdown for the Shorts type. "No type" items show only under "Show all".
+function ShortsTypeSelect({ value, onChange, ...rest }) {
+  return (
+    <select className="ad-input" value={value} onChange={(event) => onChange(event.target.value)} {...rest}>
+      <option value="">No type (Show all only)</option>
+      {shortsTypes.map((type) => (
+        <option key={type.id} value={type.id}>
+          {type.label}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+// One uploaded file or link: edit its title (and Shorts type), or delete it.
+function ItemRow({ entry, onSave, onDelete }) {
   const [title, setTitle] = useState(entry.title)
+  const [subcategory, setSubcategory] = useState(entry.subcategory)
   const [isBusy, setIsBusy] = useState(false)
-  const hasChanged = title.trim() !== entry.title
+  const isShort = entry.category === "shorts"
+  const hasChanged = title.trim() !== entry.title || subcategory !== entry.subcategory
 
   const save = async (event) => {
     event.preventDefault()
     setIsBusy(true)
-    await onSaveTitle(entry, title.trim())
+    await onSave(entry, title.trim(), subcategory)
     setIsBusy(false)
   }
 
@@ -60,6 +78,14 @@ function ItemRow({ entry, onSaveTitle, onDelete }) {
         placeholder="Title shown on the site"
         onChange={(event) => setTitle(event.target.value)}
       />
+      {isShort && (
+        <ShortsTypeSelect
+          value={subcategory}
+          onChange={setSubcategory}
+          aria-label="Shorts type"
+          style={{ flex: "0 0 190px" }}
+        />
+      )}
       <button type="submit" className="ad-small" disabled={!hasChanged || isBusy}>
         Save
       </button>
@@ -85,11 +111,13 @@ export default function Admin() {
   const [fileInputKey, setFileInputKey] = useState(0)
   const [uploadTitle, setUploadTitle] = useState("")
   const [uploadCategory, setUploadCategory] = useState("motion-saas")
+  const [uploadSubcategory, setUploadSubcategory] = useState("")
   const [isUploading, setIsUploading] = useState(false)
 
   const [linkTitle, setLinkTitle] = useState("")
   const [linkUrl, setLinkUrl] = useState("")
   const [linkCategory, setLinkCategory] = useState("motion-saas")
+  const [linkSubcategory, setLinkSubcategory] = useState("")
   const [linkKind, setLinkKind] = useState("youtube")
 
   const post = useCallback(
@@ -159,6 +187,8 @@ export default function Admin() {
         source: "upload",
         publicId: item.publicId || `portfolio/${item.name}`,
         type: item.type,
+        category,
+        subcategory: category === "shorts" ? resolveShortsType(item.subcategory) : "",
         title: (item.title || "").trim() || cleanTitle(meta.displayName),
         kindLabel: item.type === "image" ? "Image" : "Video",
       })
@@ -171,6 +201,8 @@ export default function Admin() {
         key: `link-${link.id}`,
         source: "link",
         id: link.id,
+        category,
+        subcategory: category === "shorts" ? resolveShortsType(link.subcategory) : "",
         title: link.title || link.url || "",
         kindLabel: kindLabels[link.kind] || "Link",
       })
@@ -189,6 +221,7 @@ export default function Admin() {
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
     const publicId = `${uploadCategory}__standard__${Date.now()}_${safeName}`
     const title = uploadTitle.trim()
+    const subcategory = uploadCategory === "shorts" ? uploadSubcategory : ""
 
     setIsUploading(true)
     setStatus("Uploading...")
@@ -222,11 +255,12 @@ export default function Admin() {
       const uploaded = await uploadResponse.json()
 
       let titleProblem = ""
-      if (title) {
+      if (title || subcategory) {
         const titleResponse = await post("/api/cloudinary-update-title", {
           publicId: uploaded.public_id,
           resourceType: uploaded.resource_type,
           title,
+          subcategory,
         })
         if (!titleResponse.ok) {
           titleProblem = await readError(titleResponse, "Unable to save title.")
@@ -235,7 +269,7 @@ export default function Admin() {
 
       setStatus(
         titleProblem
-          ? `Uploaded, but the title was not saved: ${titleProblem}`
+          ? `Uploaded, but the title and type were not saved: ${titleProblem}`
           : "✓ Upload complete!"
       )
       setFile(null)
@@ -263,6 +297,7 @@ export default function Admin() {
         title: linkTitle.trim(),
         url: linkUrl.trim(),
         category: linkCategory,
+        subcategory: linkCategory === "shorts" ? linkSubcategory : "",
         kind: linkKind,
       })
       if (!response.ok) {
@@ -278,13 +313,13 @@ export default function Admin() {
     }
   }
 
-  const handleSaveTitle = async (entry, title) => {
+  const handleSave = async (entry, title, subcategory) => {
     if (entry.source === "link" && !title) {
       setStatus("A link needs a title.")
       return
     }
 
-    setStatus("Saving title...")
+    setStatus("Saving...")
     try {
       const response =
         entry.source === "upload"
@@ -292,16 +327,17 @@ export default function Admin() {
               publicId: entry.publicId,
               resourceType: entry.type,
               title,
+              subcategory,
             })
-          : await post("/api/external-links", { action: "update", id: entry.id, title })
+          : await post("/api/external-links", { action: "update", id: entry.id, title, subcategory })
       if (!response.ok) {
-        setStatus(`Title not saved: ${await readError(response, "Unable to save title.")}`)
+        setStatus(`Not saved: ${await readError(response, "Unable to save.")}`)
         return
       }
-      setStatus("✓ Title saved!")
+      setStatus("✓ Saved!")
       await loadAll()
     } catch (error) {
-      setStatus(`Title not saved: ${error.message || "Save error"}`)
+      setStatus(`Not saved: ${error.message || "Save error"}`)
     }
   }
 
@@ -410,6 +446,12 @@ export default function Admin() {
                   {categoryOptions}
                 </select>
               </label>
+              {uploadCategory === "shorts" && (
+                <label className="ad-field">
+                  <span className="cd-mono cd-muted">Shorts type</span>
+                  <ShortsTypeSelect value={uploadSubcategory} onChange={setUploadSubcategory} />
+                </label>
+              )}
               <label
                 className="ad-drop"
                 onDragOver={(event) => event.preventDefault()}
@@ -474,6 +516,12 @@ export default function Admin() {
                   </select>
                 </label>
               </div>
+              {linkCategory === "shorts" && (
+                <label className="ad-field">
+                  <span className="cd-mono cd-muted">Shorts type</span>
+                  <ShortsTypeSelect value={linkSubcategory} onChange={setLinkSubcategory} />
+                </label>
+              )}
               <label className="ad-field">
                 <span className="cd-mono cd-muted">URL</span>
                 <input
@@ -492,7 +540,9 @@ export default function Admin() {
 
             <section className="ad-card">
               <h2 className="cd-h3">Your work</h2>
-              <p className="cd-muted">Change a title and press Save. The site shows the new title.</p>
+              <p className="cd-muted">
+                Change a title and press Save. For Shorts you can also pick a type.
+              </p>
               {isLoading && uploads.length === 0 && links.length === 0 ? (
                 <p className="cd-muted">Loading...</p>
               ) : (
@@ -510,7 +560,7 @@ export default function Admin() {
                           <ItemRow
                             key={entry.key}
                             entry={entry}
-                            onSaveTitle={handleSaveTitle}
+                            onSave={handleSave}
                             onDelete={handleDelete}
                           />
                         ))

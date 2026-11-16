@@ -2,7 +2,7 @@ import { useCallback, useState } from "react"
 import Navigation from "../components/Navigation"
 import Portfolio from "../components/Portfolio"
 import MediaModal from "../components/MediaModal"
-import usePortfolioItems from "../hooks/usePortfolioItems"
+import usePortfolioItems, { shortsTypes } from "../hooks/usePortfolioItems"
 
 export default function PortfolioPage() {
   const { items, isLoading } = usePortfolioItems()
@@ -28,6 +28,7 @@ export default function PortfolioPage() {
         category="shorts"
         tall
         flush
+        filters={shortsTypes}
         items={items}
         isLoading={isLoading}
         onOpen={setSelectedItem}

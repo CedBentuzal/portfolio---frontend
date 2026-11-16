@@ -6,7 +6,7 @@ import Portfolio from "../components/Portfolio"
 import AiAssisted from "../components/AiAssisted"
 import Contact from "../components/Contact"
 import MediaModal from "../components/MediaModal"
-import usePortfolioItems from "../hooks/usePortfolioItems"
+import usePortfolioItems, { shortsTypes } from "../hooks/usePortfolioItems"
 
 export default function Home() {
   const { items, isLoading } = usePortfolioItems()
@@ -108,6 +108,7 @@ export default function Home() {
         category="shorts"
         tall
         flush
+        filters={shortsTypes}
         items={items}
         isLoading={isLoading}
         onOpen={setSelectedItem}

@@ -9,6 +9,16 @@ export const portfolioCategories = [
   { id: "ai-assisted", label: "AI Assisted" },
 ]
 
+// Types inside the Shorts section. A short with no type shows only under "Show all".
+export const shortsTypes = [
+  { id: "real-estate", label: "Real Estate" },
+  { id: "fitness", label: "Fitness" },
+  { id: "talking-heads", label: "Talking heads" },
+]
+
+export const resolveShortsType = (value) =>
+  shortsTypes.some((type) => type.id === value) ? value : ""
+
 // Old categories: items saved with these ids are hidden from the site.
 const removedCategories = ["static-visuals", "brand"]
 
@@ -95,6 +105,7 @@ const fromCloudinary = (item) => {
   return {
     key: `cloudinary-${item.name}`,
     category,
+    subcategory: category === "shorts" ? resolveShortsType(item.subcategory) : "",
     createdAt: Date.parse(item.created_at) || 0,
     // The title typed in the admin panel wins; the file name is the fallback.
     title: (item.title || "").trim() || cleanTitle(meta.displayName) || "Untitled",
@@ -112,6 +123,7 @@ const fromExternal = (link) => {
   const base = {
     key: `external-${link.id}`,
     category,
+    subcategory: category === "shorts" ? resolveShortsType(link.subcategory) : "",
     createdAt: Number(link.createdAt) || 0,
   }
 

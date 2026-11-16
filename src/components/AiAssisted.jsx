@@ -72,7 +72,7 @@ export default function AiAssisted({ items = [], onOpen = () => {} }) {
                 className="cd-btn cd-btn--ghost"
                 onClick={() => setShowAll((previous) => !previous)}
               >
-                {showAll ? "Show less" : `Show all (${aiItems.length})`}
+                {showAll ? "Show less" : `Show more (${aiItems.length - INITIAL_COUNT})`}
               </button>
             </div>
           )}
