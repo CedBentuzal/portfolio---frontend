@@ -1,38 +1,38 @@
 /* ==========================================================
    CDBN portfolio — "Night and Day" theme
-   Palette: #2a0800, #775144, #c09891, #bea8a7, #f4dbd8
+   Palette: #eeeeee, #cccccc, #999999, #666666, #333333, #000000
    ========================================================== */
 
 :root,
 html[data-theme="day"] {
-  --bg: #faefed;
-  --surface: #f4dbd8;
-  --surface-2: #bea8a7;
-  --text: #2a0800;
-  --muted: #8b6c62;
-  --accent: #775144;
-  --line: #e9cfcb;
-  --inv-bg: #775144;
-  --inv-surface: #5c3a30;
-  --inv-text: #fff6f4;
-  --inv-muted: #f4dbd8;
-  --nav-bg: rgba(250, 239, 237, 0.86);
+  --bg: #f6f6f6;
+  --surface: #eeeeee;
+  --surface-2: #cccccc;
+  --text: #000000;
+  --muted: #666666;
+  --accent: #666666;
+  --line: #dddddd;
+  --inv-bg: #333333;
+  --inv-surface: #1a1a1a;
+  --inv-text: #eeeeee;
+  --inv-muted: #cccccc;
+  --nav-bg: rgba(246, 246, 246, 0.86);
   color-scheme: light;
 }
 
 html[data-theme="night"] {
-  --bg: #1c0500;
-  --surface: #2a0800;
-  --surface-2: #4a2a20;
-  --text: #f4dbd8;
-  --muted: #bea8a7;
-  --accent: #c09891;
-  --line: #3d1a11;
-  --inv-bg: #f4dbd8;
-  --inv-surface: #c09891;
-  --inv-text: #2a0800;
-  --inv-muted: #775144;
-  --nav-bg: rgba(28, 5, 0, 0.86);
+  --bg: #000000;
+  --surface: #1a1a1a;
+  --surface-2: #333333;
+  --text: #eeeeee;
+  --muted: #999999;
+  --accent: #cccccc;
+  --line: #262626;
+  --inv-bg: #eeeeee;
+  --inv-surface: #cccccc;
+  --inv-text: #000000;
+  --inv-muted: #666666;
+  --nav-bg: rgba(0, 0, 0, 0.86);
   color-scheme: dark;
 }
 
@@ -368,7 +368,7 @@ body:has(.cd-site) {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(42, 8, 0, 0.05) 40%, rgba(42, 8, 0, 0.55) 100%);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 40%, rgba(0, 0, 0, 0.55) 100%);
   pointer-events: none;
 }
 .cd-reel-label {
@@ -376,7 +376,7 @@ body:has(.cd-site) {
   left: clamp(16px, 2.2vw, 32px);
   bottom: clamp(16px, 2.2vw, 32px);
   z-index: 2;
-  color: #faefed;
+  color: #eeeeee;
 }
 .cd-play {
   position: absolute;
@@ -388,8 +388,8 @@ body:has(.cd-site) {
   margin: 0;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: #faefed;
-  color: #2a0800;
+  background: #eeeeee;
+  color: #000000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -704,7 +704,7 @@ body:has(.cd-site) {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(28, 5, 0, 0.82);
+  background: rgba(0, 0, 0, 0.82);
 }
 .cd-modal-box {
   position: relative;
@@ -737,8 +737,8 @@ body:has(.cd-site) {
   height: 40px;
   border: none;
   border-radius: 50%;
-  background: #faefed;
-  color: #2a0800;
+  background: #eeeeee;
+  color: #000000;
   font-size: 20px;
   line-height: 1;
 }
