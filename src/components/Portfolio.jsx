@@ -17,7 +17,8 @@ export default function Portfolio({
 }) {
   const [showAll, setShowAll] = useState(false)
 
-  const initialCount = tall ? 8 : 6
+  // Show 4 first; the "Show all" button reveals the rest.
+  const initialCount = 4
   const sectionItems = items.filter((item) => item.category === category)
   const visible = showAll ? sectionItems : sectionItems.slice(0, initialCount)
 
@@ -57,7 +58,7 @@ export default function Portfolio({
               className="cd-btn cd-btn--ghost"
               onClick={() => setShowAll((previous) => !previous)}
             >
-              {showAll ? "Show less" : `View all ${title.toLowerCase()}`}
+              {showAll ? "Show less" : `Show all (${sectionItems.length})`}
             </button>
           </div>
         )}

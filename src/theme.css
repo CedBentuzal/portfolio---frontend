@@ -578,8 +578,19 @@ body:has(.cd-site) {
 }
 .cd-ai-cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 32px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+}
+.cd-ai-panel .cd-more {
+  margin-top: 0;
+}
+.cd-ai-panel .cd-btn--ghost {
+  border-color: var(--inv-text);
+  color: var(--inv-text) !important;
+}
+.cd-ai-panel .cd-btn--ghost:hover {
+  background: var(--inv-text);
+  color: var(--inv-bg) !important;
 }
 .cd-ai-panel .cd-thumb {
   aspect-ratio: 357 / 400;

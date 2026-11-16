@@ -1,4 +1,7 @@
+import { useState } from "react"
 import WorkCard from "./WorkCard"
+
+const INITIAL_COUNT = 4
 
 const steps = [
   ["01", "Idea & script"],
@@ -8,7 +11,7 @@ const steps = [
 ]
 
 // Shown only while there is no "AI Assisted" work uploaded yet.
-const placeholders = ["Ideas and moodboards", "Style frames", "Assets and cleanup"]
+const placeholders = ["Ideas and moodboards", "Style frames", "Assets and cleanup", "Animation tests"]
 
 const Sparkle = () => (
   <svg className="cd-sparkle" viewBox="0 0 24 24" aria-hidden="true">
@@ -21,7 +24,9 @@ const Sparkle = () => (
 
 // New section: work made with help from AI tools.
 export default function AiAssisted({ items = [], onOpen = () => {} }) {
+  const [showAll, setShowAll] = useState(false)
   const aiItems = items.filter((item) => item.category === "ai-assisted")
+  const visible = showAll ? aiItems : aiItems.slice(0, INITIAL_COUNT)
 
   return (
     <section id="ai-assisted" className="reveal-section">
@@ -44,7 +49,7 @@ export default function AiAssisted({ items = [], onOpen = () => {} }) {
 
           <div className="cd-ai-cards">
             {aiItems.length > 0
-              ? aiItems.map((item) => (
+              ? visible.map((item) => (
                   <WorkCard key={item.key} item={item} tag="AI Assisted" onOpen={onOpen} />
                 ))
               : placeholders.map((title) => (
@@ -60,6 +65,18 @@ export default function AiAssisted({ items = [], onOpen = () => {} }) {
                   </div>
                 ))}
           </div>
+
+          {aiItems.length > INITIAL_COUNT && (
+            <div className="cd-more">
+              <button
+                type="button"
+                className="cd-btn cd-btn--ghost"
+                onClick={() => setShowAll((previous) => !previous)}
+              >
+                {showAll ? "Show less" : `Show all (${aiItems.length})`}
+              </button>
+            </div>
+          )}
 
           <div className="cd-steps">
             {steps.map(([number, label]) => (
