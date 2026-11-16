@@ -2,7 +2,8 @@ import { useEffect, useState } from "react"
 import ThemeToggle from "./ThemeToggle"
 
 const links = [
-  ["#portfolio", "Work"],
+  ["#motion-design", "Motion design"],
+  ["#shorts", "Shorts"],
   ["#ai-assisted", "AI Assisted"],
   ["#about", "About"],
   ["#contact", "Contact"],

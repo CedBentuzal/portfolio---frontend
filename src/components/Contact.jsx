@@ -6,7 +6,7 @@ export default function Contact() {
   return (
     <section id="contact" className="cd-contact reveal-section">
       <div className="cd-wrap cd-contact-inner">
-        <span className="cd-mono cd-muted">(04) Contact</span>
+        <span className="cd-mono cd-muted">(05) Contact</span>
 
         <h2 className="cd-hero-title">
           Let's make

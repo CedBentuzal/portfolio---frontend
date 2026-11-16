@@ -12,7 +12,26 @@ export default function PortfolioPage() {
   return (
     <div className="cd-site">
       <Navigation />
-      <Portfolio items={items} isLoading={isLoading} onOpen={setSelectedItem} />
+      <Portfolio
+        id="motion-design"
+        number="01"
+        title="Motion design"
+        category="motion-saas"
+        items={items}
+        isLoading={isLoading}
+        onOpen={setSelectedItem}
+      />
+      <Portfolio
+        id="shorts"
+        number="02"
+        title="Shorts"
+        category="shorts"
+        tall
+        flush
+        items={items}
+        isLoading={isLoading}
+        onOpen={setSelectedItem}
+      />
       <MediaModal item={selectedItem} onClose={closeModal} />
     </div>
   )

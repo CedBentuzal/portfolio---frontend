@@ -26,7 +26,7 @@ export default function Hero({ onOpen = () => {} }) {
             idea to final render.
           </p>
           <div className="cd-cta">
-            <a href="#portfolio" className="cd-btn">
+            <a href="#motion-design" className="cd-btn">
               View work
             </a>
             <button

@@ -21,7 +21,7 @@ const Sparkle = () => (
 
 // New section: work made with help from AI tools.
 export default function AiAssisted({ items = [], onOpen = () => {} }) {
-  const aiItems = items.filter((item) => item.category === "ai-assisted").slice(0, 3)
+  const aiItems = items.filter((item) => item.category === "ai-assisted")
 
   return (
     <section id="ai-assisted" className="reveal-section">
@@ -29,7 +29,7 @@ export default function AiAssisted({ items = [], onOpen = () => {} }) {
         <div className="cd-ai-panel">
           <div className="cd-section-head">
             <div>
-              <span className="cd-mono cd-muted">(02) New — AI Assisted</span>
+              <span className="cd-mono cd-muted">(03) New — AI Assisted</span>
               <h2 className="cd-h2">
                 AI assisted,
                 <br />

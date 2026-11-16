@@ -10,7 +10,7 @@ export default function About() {
     <section id="about" className="reveal-section">
       <div className="cd-wrap cd-about">
         <div>
-          <span className="cd-mono cd-muted">(03) About</span>
+          <span className="cd-mono cd-muted">(04) About</span>
           <h2 className="cd-h2">Hi, I'm Ced.</h2>
         </div>
 

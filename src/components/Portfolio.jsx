@@ -1,49 +1,42 @@
-import { useMemo, useState } from "react"
-import { categoryLabel, portfolioCategories } from "../hooks/usePortfolioItems"
+import { useState } from "react"
 import WorkCard from "./WorkCard"
 
-const filters = [{ id: "all", label: "All" }, ...portfolioCategories]
-const INITIAL_COUNT = 6
-
-// "Selected work" section: filter chips + project grid.
-export default function Portfolio({ items = [], isLoading = false, onOpen = () => {} }) {
-  const [activeFilter, setActiveFilter] = useState("all")
+// One work section for one category (for example Motion design or Shorts).
+// `tall` shows the cards in the upright 9:16 shape used for shorts.
+// `flush` removes the top space when the section follows another work section.
+export default function Portfolio({
+  id,
+  number,
+  title,
+  category,
+  tall = false,
+  flush = false,
+  items = [],
+  isLoading = false,
+  onOpen = () => {},
+}) {
   const [showAll, setShowAll] = useState(false)
 
-  const filtered = useMemo(
-    () => (activeFilter === "all" ? items : items.filter((item) => item.category === activeFilter)),
-    [items, activeFilter]
-  )
-  const visible = showAll ? filtered : filtered.slice(0, INITIAL_COUNT)
-  const isTall = activeFilter === "shorts"
+  const initialCount = tall ? 8 : 6
+  const sectionItems = items.filter((item) => item.category === category)
+  const visible = showAll ? sectionItems : sectionItems.slice(0, initialCount)
 
   return (
-    <section id="portfolio" className="reveal-section">
-      <div className="cd-wrap cd-work">
+    <section id={id} className="reveal-section">
+      <div className={`cd-wrap cd-work ${flush ? "cd-work--flush" : ""}`}>
         <div className="cd-section-head">
           <div>
-            <span className="cd-mono cd-muted">(01) Work</span>
-            <h2 className="cd-h2">Selected work</h2>
+            <span className="cd-mono cd-muted">({number}) Work</span>
+            <h2 className="cd-h2">{title}</h2>
           </div>
-          <div className="cd-filters" role="group" aria-label="Filter work">
-            {filters.map((filter) => (
-              <button
-                key={filter.id}
-                type="button"
-                className={`cd-chip cd-mono ${activeFilter === filter.id ? "is-active" : ""}`}
-                aria-pressed={activeFilter === filter.id}
-                onClick={() => {
-                  setActiveFilter(filter.id)
-                  setShowAll(false)
-                }}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
+          {!isLoading && sectionItems.length > 0 && (
+            <span className="cd-mono cd-muted">
+              {sectionItems.length} {sectionItems.length === 1 ? "project" : "projects"}
+            </span>
+          )}
         </div>
 
-        <div className={`cd-grid ${isTall ? "cd-grid--tall" : ""}`}>
+        <div className={`cd-grid ${tall ? "cd-grid--tall" : ""}`}>
           {isLoading ? (
             [0, 1, 2, 3].map((index) => (
               <div key={index} className="cd-card cd-skeleton" aria-hidden="true">
@@ -51,18 +44,20 @@ export default function Portfolio({ items = [], isLoading = false, onOpen = () =
               </div>
             ))
           ) : visible.length > 0 ? (
-            visible.map((item) => (
-              <WorkCard key={item.key} item={item} tag={categoryLabel(item.category)} onOpen={onOpen} />
-            ))
+            visible.map((item) => <WorkCard key={item.key} item={item} onOpen={onOpen} />)
           ) : (
             <p className="cd-empty cd-muted">Nothing here yet. New work is coming soon.</p>
           )}
         </div>
 
-        {!isLoading && filtered.length > INITIAL_COUNT && (
+        {!isLoading && sectionItems.length > initialCount && (
           <div className="cd-more">
-            <button type="button" className="cd-btn cd-btn--ghost" onClick={() => setShowAll((prev) => !prev)}>
-              {showAll ? "Show less" : "View all work"}
+            <button
+              type="button"
+              className="cd-btn cd-btn--ghost"
+              onClick={() => setShowAll((previous) => !previous)}
+            >
+              {showAll ? "Show less" : `View all ${title.toLowerCase()}`}
             </button>
           </div>
         )}

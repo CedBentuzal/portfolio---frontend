@@ -92,7 +92,26 @@ export default function Home() {
     <div className="cd-site">
       <Navigation />
       <Hero onOpen={setSelectedItem} />
-      <Portfolio items={items} isLoading={isLoading} onOpen={setSelectedItem} />
+      <Portfolio
+        id="motion-design"
+        number="01"
+        title="Motion design"
+        category="motion-saas"
+        items={items}
+        isLoading={isLoading}
+        onOpen={setSelectedItem}
+      />
+      <Portfolio
+        id="shorts"
+        number="02"
+        title="Shorts"
+        category="shorts"
+        tall
+        flush
+        items={items}
+        isLoading={isLoading}
+        onOpen={setSelectedItem}
+      />
       <AiAssisted items={items} onOpen={setSelectedItem} />
       <About />
       <Contact />

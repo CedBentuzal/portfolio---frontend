@@ -4,7 +4,7 @@ const backendBaseUrl = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "
 
 // Categories shown on the site. "Static visuals" and "Brand" were removed.
 export const portfolioCategories = [
-  { id: "motion-saas", label: "Motion and SaaS" },
+  { id: "motion-saas", label: "Motion design" },
   { id: "shorts", label: "Shorts" },
   { id: "ai-assisted", label: "AI Assisted" },
 ]
