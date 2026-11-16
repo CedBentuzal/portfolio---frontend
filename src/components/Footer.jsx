@@ -2,6 +2,7 @@ const socials = [
   ["Instagram", "https://www.instagram.com/cdbn.ae/"],
   ["TikTok", "https://www.tiktok.com/@ced.ae"],
   ["Facebook", "https://www.facebook.com/Bentuzal/"],
+  ["Linkend", "https://www.linkedin.com/in/ced-louise-bentuzal-65a787368/"]
 ]
 
 export default function Footer() {
